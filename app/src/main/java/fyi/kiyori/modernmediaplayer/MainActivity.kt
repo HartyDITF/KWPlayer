@@ -351,8 +351,106 @@ private fun KwPlayerScreen(player: ExoPlayer) {
                 )
             }
 
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Panel, RoundedCornerShape(16.dp))
+                    .padding(15.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "ОБНОВЛЕНИЯ",
+                    color = Accent,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    "Установлена версия ${BuildConfig.VERSION_NAME}",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(updateMessage, color = Muted, fontSize = 11.sp)
+                availableRelease?.let { release ->
+                    Text(
+                        "Доступна версия ${release.versionName} • ${String.format("%.1f", release.apkSize / 1_048_576f)} МБ",
+                        color = Accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(release.notes.take(500), color = Muted, fontSize = 11.sp)
+                }
+                Button(
+                    onClick = {
+                        updateBusy = true
+                        updateMessage = "Проверяем GitHub Releases…"
+                        AppUpdater.check { release, error ->
+                            updateBusy = false
+                            availableRelease = release
+                            downloadedApk = null
+                            updateMessage = when {
+                                error != null -> "Ошибка проверки: $error"
+                                release != null -> "Доступно обновление. Можно скачать APK."
+                                else -> "У вас установлена последняя версия."
+                            }
+                        }
+                    },
+                    enabled = !updateBusy,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PanelRaised)
+                ) {
+                    Text("ПРОВЕРИТЬ ОБНОВЛЕНИЯ", color = TextPrimary, fontWeight = FontWeight.Bold)
+                }
+                if (availableRelease != null && downloadedApk == null) {
+                    Button(
+                        onClick = {
+                            val release = availableRelease ?: return@Button
+                            updateBusy = true
+                            updateMessage = "Скачиваем обновление…"
+                            AppUpdater.download(context, release) { file, error ->
+                                updateBusy = false
+                                downloadedApk = file
+                                updateMessage = if (error == null) {
+                                    "APK загружен. Нажмите «Установить»."
+                                } else {
+                                    "Ошибка загрузки: $error"
+                                }
+                            }
+                        },
+                        enabled = !updateBusy,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                    ) {
+                        Text("СКАЧАТЬ ОБНОВЛЕНИЕ", color = Color(0xFF06111C), fontWeight = FontWeight.Bold)
+                    }
+                }
+                downloadedApk?.let { apk ->
+                    Button(
+                        onClick = {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                val launched = AppUpdater.install(activity, apk)
+                                updateMessage = if (launched) {
+                                    "Подтвердите установку в системном окне Android."
+                                } else {
+                                    "Разрешите установку из KW Player в настройках Android, затем нажмите «Установить» ещё раз."
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                    ) {
+                        Text("УСТАНОВИТЬ ОБНОВЛЕНИЕ", color = Color(0xFF06111C), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
             Text(
-                text = "KIBATO WATCH PLAYER  •  0.1.0",
+                text = "KIBATO WATCH PLAYER  •  ${BuildConfig.VERSION_NAME}",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp, bottom = 6.dp),
