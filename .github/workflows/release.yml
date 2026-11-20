@@ -52,10 +52,13 @@ jobs:
           test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
           gradle --no-daemon assembleRelease
 
+      - name: Prepare release APK filename
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/KWPlayer.apk
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: KW Player ${{ github.ref_name }}
           generate_release_notes: true
-          files: app/build/outputs/apk/release/app-release.apk
+          files: app/build/outputs/apk/release/KWPlayer.apk
           fail_on_unmatched_files: true
