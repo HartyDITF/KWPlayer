@@ -39,9 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -55,8 +52,13 @@ private val Accent = Color(0xFF55B8FF)
 private val Muted = Color(0xFF9AA9BA)
 
 class MainActivity : ComponentActivity() {
+    private lateinit var player: ExoPlayer
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        player = ExoPlayer.Builder(this).build().apply {
+            repeatMode = Player.REPEAT_MODE_OFF
+        }
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -67,21 +69,25 @@ class MainActivity : ComponentActivity() {
                     onSurface = Color(0xFFEAF3FC)
                 )
             ) {
-                ModernMediaPlayerScreen()
+                ModernMediaPlayerScreen(player)
             }
         }
+    }
+
+    override fun onStop() {
+        player.pause()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        player.release()
+        super.onDestroy()
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun ModernMediaPlayerScreen() {
+private fun ModernMediaPlayerScreen(player: ExoPlayer) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val player = remember(context) {
-        ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_OFF
-        }
-    }
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -125,16 +131,7 @@ private fun ModernMediaPlayerScreen() {
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            player.release()
         }
-    }
-
-    DisposableEffect(lifecycleOwner, player) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) player.pause()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Surface(
