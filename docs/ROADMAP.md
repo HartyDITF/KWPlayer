@@ -6,9 +6,9 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**.
 - [x] Create private GitHub repository.
 - [x] Record product goals and non-functional requirements.
 - [x] Record initial architecture and playback-engine strategy.
-- [ ] Add Android Gradle project scaffold.
-- [ ] Add GitHub Actions debug APK build.
-- [ ] Confirm dependency licenses and versions.
+- [x] Add Android Gradle project scaffold.
+- [x] Add GitHub Actions debug APK build configuration.
+- [x] Select initial stable dependency versions; full license inventory remains before release.
 - [ ] Establish baseline APK size and build checks.
 
 ## Stage 1 — Minimal working player
