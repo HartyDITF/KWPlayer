@@ -12,7 +12,7 @@ A private, offline-first Android media player inspired by Winamp Modern and VLC.
 
 ## Development status
 
-**Planning / foundation stage.** The repository currently contains project documentation. No installable APK is available yet.
+**First app scaffold committed.** The app now has a native Android entry point, a dark starter screen, local video picking, and Media3 playback controls. GitHub Actions is configured to build a debug APK. The first successful CI build and real-device playback tests are still pending.
 
 See:
 - [Product specification](docs/PRODUCT_SPEC.md)
