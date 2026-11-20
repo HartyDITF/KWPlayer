@@ -1,6 +1,8 @@
 package fyi.kiyori.modernmediaplayer
 
+import android.app.Activity
 import android.net.Uri
+import java.io.File
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -110,6 +112,10 @@ private fun KwPlayerScreen(player: ExoPlayer) {
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var playbackError by remember { mutableStateOf<String?>(null) }
+    var updateMessage by remember { mutableStateOf("Проверяйте наличие новых версий KW Player.") }
+    var availableRelease by remember { mutableStateOf<KwRelease?>(null) }
+    var downloadedApk by remember { mutableStateOf<File?>(null) }
+    var updateBusy by remember { mutableStateOf(false) }
 
     val openVideo = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
