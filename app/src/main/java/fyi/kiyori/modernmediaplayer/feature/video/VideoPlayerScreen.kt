@@ -1,6 +1,13 @@
 package fyi.kiyori.modernmediaplayer.feature.video
 
 import android.app.Activity
+import android.app.PictureInPictureParams
+import android.os.Build
+import android.util.Rational
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -52,6 +59,37 @@ fun VideoPlayerScreen(
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
     var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
+    var subtitleNotice by remember { mutableStateOf<String?>(null) }
+
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val suffix = uri.lastPathSegment.orEmpty().substringAfterLast('.', "").lowercase(Locale.ROOT)
+            val mime = when (suffix) {
+                "srt" -> MimeTypes.APPLICATION_SUBRIP
+                "vtt" -> MimeTypes.TEXT_VTT
+                "ass", "ssa" -> MimeTypes.TEXT_SSA
+                else -> context.contentResolver.getType(uri) ?: MimeTypes.APPLICATION_SUBRIP
+            }
+            val current = controller?.currentMediaItem
+            if (controller != null && current?.localConfiguration?.uri != null) {
+                val wasPlaying = controller.isPlaying
+                val resumeAt = controller.currentPosition.coerceAtLeast(0L)
+                val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
+                    .setMimeType(mime)
+                    .setLanguage("und")
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .build()
+                val updated = current.buildUpon().setSubtitleConfigurations(listOf(subtitle)).build()
+                controller.setMediaItem(updated, resumeAt)
+                controller.prepare()
+                if (wasPlaying) controller.play()
+                subtitleNotice = "Внешние субтитры добавлены"
+            }
+        }
+    }
 
     BackHandler {
         if (fullscreen) {
@@ -143,6 +181,15 @@ fun VideoPlayerScreen(
                             Text(title, color = Color.White, maxLines = 1)
                             Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
                         }
+                        TextButton(onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                runCatching {
+                                    activity?.enterPictureInPictureMode(
+                                        PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+                                    )
+                                }
+                            }
+                        }) { Text("PiP", color = accent, fontSize = 13.sp) }
                         TextButton(onClick = { fullscreen = !fullscreen; controlsVisible = true }) {
                             Text(if (fullscreen) "⤢" else "⛶", color = Color.White, fontSize = 20.sp)
                         }
@@ -172,7 +219,10 @@ fun VideoPlayerScreen(
                                 }
                             },
                             enabled = controller != null
-                        ) { Text("Субтитры", color = accent) }
+                        ) { Text("Дорожки", color = accent) }
+                        TextButton(onClick = {
+                            subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
+                        }) { Text("Файл субтитров", color = accent) }
                         Box {
                             TextButton(onClick = { aspectMenu = true }) { Text("Формат кадра", color = accent) }
                             DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
@@ -209,6 +259,9 @@ fun VideoPlayerScreen(
                             shuffleEnabled = !shuffleEnabled
                             controller?.shuffleModeEnabled = shuffleEnabled
                         }) { Text(if (shuffleEnabled) "Перемешивание: вкл." else "Перемешивание", color = accent) }
+                    }
+                    subtitleNotice?.let {
+                        Text(it, color = Color.LightGray, fontSize = 10.sp, modifier = Modifier.padding(start = 14.dp, bottom = 3.dp))
                     }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
