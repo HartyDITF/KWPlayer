@@ -22,7 +22,8 @@ KW Player (Kibato Watch Player) is a free, local-first Android media player with
 - Room database stores the scanned media index and resume positions; legacy SharedPreferences index remains available for migration/fallback.
 - Preferences DataStore stores skin and accent settings and migrates the former skin preference.
 - Dedicated audio now-playing overlay with seek, shuffle, previous/next, playback toggle and device-supported equalizer bands.
-- Dedicated landscape video overlay with Media3 PlayerView, seek, ±10 second controls, subtitle-track toggle and playback speed.
+- Dedicated landscape video player with Media3 PlayerView, seek, ±10 second controls, audio/subtitle track selection dialogs, aspect-ratio modes, repeat, shuffle and selectable playback speeds.
+- Optional background playback for video, disabled by default and switchable both in the video player and settings. When disabled, video pauses as the app enters the background.
 - Built-in Modern Dark, Classic Orange, Light and AMOLED Black theme choices.
 - Glance playback widget with previous/play-pause/next controls.
 - In-app GitHub release check, APK download and installer handoff.
