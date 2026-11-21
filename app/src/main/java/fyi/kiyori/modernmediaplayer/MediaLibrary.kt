@@ -1,9 +1,9 @@
 package fyi.kiyori.modernmediaplayer
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.database.Cursor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.ArrayDeque
@@ -47,17 +47,19 @@ object MediaLibrary {
     fun scan(context: Context): List<LocalMediaItem> {
         val resolver = context.contentResolver
         val found = LinkedHashMap<String, LocalMediaItem>()
-        val queue = ArrayDeque<Pair<Uri, Int>>()
+        val queue = ArrayDeque<Triple<Uri, String, Int>>()
         folders(context).forEach { raw ->
-            runCatching { queue.add(Uri.parse(raw) to 0) }
+            runCatching {
+                val treeUri = Uri.parse(raw)
+                queue.add(Triple(treeUri, DocumentsContract.getTreeDocumentId(treeUri), 0))
+            }
         }
         val visited = HashSet<String>()
         while (queue.isNotEmpty()) {
-            val (treeUri, depth) = queue.removeFirst()
-            if (depth > 32 || !visited.add(treeUri.toString())) continue
-            val documentId = runCatching { DocumentsContract.getDocumentId(treeUri) }.getOrNull() ?: continue
+            val (treeUri, parentId, depth) = queue.removeFirst()
+            if (depth > 32 || !visited.add("$treeUri|$parentId")) continue
             val childrenUri = runCatching {
-                DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
+                DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
             }.getOrNull() ?: continue
             var cursor: Cursor? = null
             try {
@@ -85,12 +87,10 @@ object MediaLibrary {
                         val mime = rows.getString(mimeCol) ?: ""
                         val childUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id)
                         if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                            queue.add(childUri to depth + 1)
+                            queue.add(Triple(treeUri, id, depth + 1))
                         } else if (mime.startsWith("video/") || mime.startsWith("audio/")) {
                             found[childUri.toString()] = LocalMediaItem(
-                                childUri,
-                                name,
-                                mime,
+                                childUri, name, mime,
                                 if (sizeCol >= 0 && !rows.isNull(sizeCol)) rows.getLong(sizeCol) else 0L,
                                 if (modifiedCol >= 0 && !rows.isNull(modifiedCol)) rows.getLong(modifiedCol) else 0L
                             )
@@ -98,9 +98,9 @@ object MediaLibrary {
                     }
                 }
             } catch (_: SecurityException) {
-                // The user may revoke a folder permission at any time.
+                // Folder access can be revoked by the user.
             } catch (_: Exception) {
-                // An unavailable provider or malformed directory must not stop other folders.
+                // An unavailable provider must not stop scanning other selected folders.
             } finally {
                 cursor?.close()
             }
@@ -118,15 +118,13 @@ object MediaLibrary {
             buildList {
                 for (i in 0 until array.length()) {
                     val item = array.getJSONObject(i)
-                    add(
-                        LocalMediaItem(
-                            Uri.parse(item.getString("uri")),
-                            item.getString("name"),
-                            item.getString("mime"),
-                            item.optLong("size"),
-                            item.optLong("modified")
-                        )
-                    )
+                    add(LocalMediaItem(
+                        Uri.parse(item.getString("uri")),
+                        item.getString("name"),
+                        item.getString("mime"),
+                        item.optLong("size"),
+                        item.optLong("modified")
+                    ))
                 }
             }
         }.getOrDefault(emptyList())
@@ -135,14 +133,12 @@ object MediaLibrary {
     private fun saveItems(context: Context, items: List<LocalMediaItem>) {
         val array = JSONArray()
         items.forEach { item ->
-            array.put(
-                JSONObject()
-                    .put("uri", item.uri.toString())
-                    .put("name", item.name)
-                    .put("mime", item.mimeType)
-                    .put("size", item.size)
-                    .put("modified", item.modified)
-            )
+            array.put(JSONObject()
+                .put("uri", item.uri.toString())
+                .put("name", item.name)
+                .put("mime", item.mimeType)
+                .put("size", item.size)
+                .put("modified", item.modified))
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(ITEMS, array.toString()).apply()
