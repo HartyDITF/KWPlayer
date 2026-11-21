@@ -236,12 +236,15 @@ private fun KwPlayerScreen(controller: MediaController?) {
     LaunchedEffect(selectedUri, controller) {
         val uri = selectedUri ?: return@LaunchedEffect
         val player = controller ?: return@LaunchedEffect
-        val item = MediaItem.Builder().setUri(uri)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(selectedName ?: "KW Player").setArtist("KW Player").build())
-            .build()
-        player.setMediaItem(item)
-        player.prepare()
-        player.play()
+        // Do not replace a queue already created by startLibraryItem.
+        if (player.currentMediaItem?.localConfiguration?.uri != uri) {
+            val item = MediaItem.Builder().setUri(uri)
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(selectedName ?: "KW Player").setArtist("KW Player").build())
+                .build()
+            player.setMediaItem(item)
+            player.prepare()
+            player.play()
+        }
     }
 
     DisposableEffect(controller) {
