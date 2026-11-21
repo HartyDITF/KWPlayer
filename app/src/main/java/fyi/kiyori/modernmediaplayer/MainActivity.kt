@@ -548,7 +548,10 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 backgroundPlaybackEnabled = enabled
                                 settingsScope.launch { settingsRepository.setBackgroundPlaybackEnabled(enabled) }
                             },
-                            onClose = { activePlayerScreen = "library" }
+                            onClose = {
+                                if (!backgroundPlaybackEnabled) controller?.pause()
+                                activePlayerScreen = "library"
+                            }
                         )
                 }
             }
