@@ -5,6 +5,8 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checke
 ## Stage 0 — Foundation
 - [x] Kotlin / Compose project and GitHub Actions build.
 - [x] Media3 playback baseline.
+- [x] Central KW Player dark design-token palette.
+- [x] Add Room, Preferences DataStore and Glance dependencies.
 
 ## Stage 1 — Playback foundation
 - [x] Open a local audio or video file through SAF.
@@ -12,6 +14,7 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checke
 - [ ] Verify background playback and HyperOS media surfaces on devices.
 - [ ] Fullscreen/orientation handling and gesture controls.
 - [ ] Codec test matrix and useful decoder diagnostics.
+- [ ] Queue, shuffle, repeat and resume positions.
 
 ## Stage 2 — Library and navigation
 - [x] Video, Audio, Browse and Playlist sections.
@@ -21,7 +24,8 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checke
 - [x] Explicit recursive scan of selected folders.
 - [x] Local video/audio index with filename search and sorting.
 - [x] Favorites and recently opened history.
-- [ ] Room database migration, duration metadata and resume positions.
+- [ ] MediaStore discovery.
+- [ ] Room entities, DAO, database and migration from the existing local index.
 - [ ] Saved playlists and full queue editing.
 
 ## Stage 3 — Playback quality
@@ -32,11 +36,12 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checke
 - [ ] Verify behavior across common containers/codecs on real devices.
 
 ## Stage 4 — Skins
-- [x] Standard, Winamp Modern, AMOLED Black, Classic Retro and Neon presets.
-- [x] Different navigation placement for Standard/AMOLED/Neon versus Winamp/Retro.
-- [x] Skin-specific panel shapes and density.
+- [x] Existing Standard, Winamp Modern, AMOLED Black, Classic Retro and Neon presets.
+- [x] Centralized base color tokens.
+- [ ] Inter / Share Tech Mono font assets and typography setup.
+- [ ] Accent color persistence with DataStore.
 - [ ] Refine skin-specific player controls and accessibility.
-- [ ] Reduced-motion option.
+- [ ] Safe skin import format and reduced-motion option.
 
 ## Stage 5 — Widgets and efficiency
 - [ ] Folder shortcut widgets.
