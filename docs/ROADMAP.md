@@ -1,48 +1,53 @@
 # Development roadmap
 
-Status labels: **Not started**, **In progress**, **Blocked**, **Done**.
+Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checked implementation item is not a claim of successful physical-device testing.
 
-## Stage 0 — Project foundation
-- [x] Android project scaffold and GitHub Actions debug build.
-- [x] Media3 dependency baseline.
+## Stage 0 — Foundation
+- [x] Kotlin / Compose project and GitHub Actions build.
+- [x] Media3 playback baseline.
 
 ## Stage 1 — Playback foundation
-- [x] Open a local video or audio file through Android's document picker.
-- [x] Media3 playback session separated from Activity lifetime.
-- [x] Android media notification / MediaSession controls integration.
-- [ ] Real-device verification of background playback, notification controls and HyperOS surfaces.
-- [ ] Fullscreen viewing, orientation behavior and playback gestures.
-- [ ] Clear decoder diagnostics and format test matrix.
+- [x] Open a local audio or video file through SAF.
+- [x] MediaSessionService and Android media controls integration.
+- [ ] Verify background playback and HyperOS media surfaces on devices.
+- [ ] Fullscreen/orientation handling and gesture controls.
+- [ ] Codec test matrix and useful decoder diagnostics.
 
-## Stage 2 — Library and playback quality
-- [ ] User-selected folders through SAF and media browsing.
-- [ ] Room library and per-file resume position.
-- [ ] Subtitle and audio-track selection.
-- [ ] Picture-in-picture and playback speed controls.
+## Stage 2 — Library and navigation
+- [x] Video, Audio, Browse, Playlist and More sections.
+- [x] User-selected SAF folders with persisted access.
+- [x] Explicit recursive scan of selected folders.
+- [x] Local video/audio index with filename search and sorting.
+- [x] Favorites and recently opened history.
+- [ ] Room database migration, duration metadata and resume positions.
+- [ ] Saved playlists and full queue editing.
 
-## Stage 3 — Widgets
-- [ ] Folder shortcut widget.
-- [ ] Independent configuration for multiple widget instances.
-- [ ] Playback controls widget.
-- [ ] Event-driven refresh; no frequent polling.
-- [ ] Validate widget behavior across launchers and screen sizes.
+## Stage 3 — Playback quality
+- [x] Playback speed control.
+- [ ] Subtitle file selection and audio/subtitle track selection UI.
+- [ ] Picture-in-picture.
+- [ ] Fullscreen controls and gestures.
+- [ ] Verify behavior across common containers/codecs on real devices.
 
-## Stage 4 — Themes and skins
-- [x] Initial local appearance presets: Standard, Winamp Modern, AMOLED Black, Classic Retro, Neon.
-- [ ] Full theme-token and data-only skin architecture.
-- [ ] Reduced-motion setting and skin validation.
+## Stage 4 — Skins
+- [x] Standard, Winamp Modern, AMOLED Black, Classic Retro and Neon presets.
+- [x] Different navigation placement for Standard/AMOLED/Neon versus Winamp/Retro.
+- [x] Skin-specific panel shapes and density.
+- [ ] Refine skin-specific player controls and accessibility.
+- [ ] Reduced-motion option.
 
-## Stage 5 — Compatibility and efficiency
-- [ ] Test on POCO X8 Pro Max and POCO M8 5G.
-- [ ] Test a lower-memory or older Android device.
-- [ ] Measure battery, memory, CPU and thermal behavior.
-- [ ] Evaluate whether a second playback engine is justified.
+## Stage 5 — Widgets and efficiency
+- [ ] Folder shortcut widgets.
+- [ ] Playback control widget.
+- [ ] Event-driven widget refresh.
+- [ ] Validate POCO X8 Pro Max and POCO M8 5G.
+- [ ] Measure battery, memory, CPU and thermals.
 
-## Stage 6 — Personal release
-- [ ] Produce signed release APK.
-- [ ] Document installation and update process.
-- [ ] Record known device/codec limitations.
+## Stage 6 — Release
+- [x] Signed v0.3.0 release and in-app updater foundation.
+- [ ] Build and test the next signed release.
+- [ ] Record physical-device test results and known limitations.
 
 ## Release rule
 
-A successful build does not prove real-device behavior. Do not claim support for a codec or firmware integration until it has been tested.
+CI success proves compilation only. It does not prove playback quality, firmware integration, codec compatibility or battery behavior.
