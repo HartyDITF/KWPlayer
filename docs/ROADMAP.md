@@ -3,30 +3,22 @@
 Status labels: **Not started**, **In progress**, **Blocked**, **Done**.
 
 ## Stage 0 — Project foundation
-- [x] Create private GitHub repository.
-- [x] Record product goals and non-functional requirements.
-- [x] Record initial architecture and playback-engine strategy.
-- [x] Add Android Gradle project scaffold.
-- [x] Add GitHub Actions debug APK build configuration.
-- [x] Select initial stable dependency versions; full license inventory remains before release.
-- [ ] Establish baseline APK size and build checks.
+- [x] Android project scaffold and GitHub Actions debug build.
+- [x] Media3 dependency baseline.
 
-## Stage 1 — Minimal working player
-- [ ] App launches on Android API 23+.
-- [ ] Open a single local video through Android file picker.
-- [ ] Play, pause, seek, rotate, and enter/exit fullscreen.
-- [ ] Handle orientation and lifecycle changes.
-- [ ] Release playback resources correctly.
-- [ ] Show useful unsupported-file and permission errors.
+## Stage 1 — Playback foundation
+- [x] Open a local video or audio file through Android's document picker.
+- [x] Media3 playback session separated from Activity lifetime.
+- [x] Android media notification / MediaSession controls integration.
+- [ ] Real-device verification of background playback, notification controls and HyperOS surfaces.
+- [ ] Fullscreen viewing, orientation behavior and playback gestures.
+- [ ] Clear decoder diagnostics and format test matrix.
 
 ## Stage 2 — Library and playback quality
-- [ ] Add user-selected folders through SAF.
-- [ ] Persist folder access and list media.
-- [ ] Add Room library and per-file resume position.
-- [ ] Add audio playback and media session controls.
-- [ ] Add subtitle and audio-track selection.
-- [ ] Add gesture controls and configurable sensitivity.
-- [ ] Add Picture-in-Picture where supported.
+- [ ] User-selected folders through SAF and media browsing.
+- [ ] Room library and per-file resume position.
+- [ ] Subtitle and audio-track selection.
+- [ ] Picture-in-picture and playback speed controls.
 
 ## Stage 3 — Widgets
 - [ ] Folder shortcut widget.
@@ -36,30 +28,21 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**.
 - [ ] Validate widget behavior across launchers and screen sizes.
 
 ## Stage 4 — Themes and skins
-- [ ] Theme tokens and skin data model.
-- [ ] Winamp Modern-inspired skin.
-- [ ] AMOLED Black.
-- [ ] Classic Retro.
-- [ ] Neon.
-- [ ] Reduced-motion mode.
-- [ ] Validate skin packs and safe fallback behavior.
+- [x] Initial local appearance presets: Standard, Winamp Modern, AMOLED Black, Classic Retro, Neon.
+- [ ] Full theme-token and data-only skin architecture.
+- [ ] Reduced-motion setting and skin validation.
 
 ## Stage 5 — Compatibility and efficiency
-- [ ] Build a format/codec/subtitle test matrix.
-- [ ] Test on POCO X8 Pro Max.
-- [ ] Test on POCO M8 5G.
-- [ ] Test a lower-memory or older Android device/emulator.
-- [ ] Measure battery use during repeatable playback sessions.
-- [ ] Measure memory, CPU, thermal behavior, and APK size.
+- [ ] Test on POCO X8 Pro Max and POCO M8 5G.
+- [ ] Test a lower-memory or older Android device.
+- [ ] Measure battery, memory, CPU and thermal behavior.
 - [ ] Evaluate whether a second playback engine is justified.
-- [ ] Fix regressions before adding optional effects.
 
 ## Stage 6 — Personal release
 - [ ] Produce signed release APK.
 - [ ] Document installation and update process.
 - [ ] Record known device/codec limitations.
-- [ ] Keep source and release artifacts in GitHub.
 
 ## Release rule
 
-Do not mark a feature complete because it compiles. It must be tested on a real device where practical. Do not claim "supports all formats"; publish only verified compatibility results.
+A successful build does not prove real-device behavior. Do not claim support for a codec or firmware integration until it has been tested.
