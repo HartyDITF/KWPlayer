@@ -4,14 +4,16 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,15 +21,25 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.TrackSelectionDialogBuilder
 import kotlinx.coroutines.delay
 import java.util.Locale
 
 @Composable
-fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color, onClose: () -> Unit) {
+fun VideoPlayerScreen(
+    controller: MediaController?,
+    title: String,
+    accent: Color,
+    backgroundPlaybackEnabled: Boolean,
+    onBackgroundPlaybackChange: (Boolean) -> Unit,
+    onClose: () -> Unit
+) {
     val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var seekPreview by remember { mutableFloatStateOf(0f) }
@@ -35,6 +47,11 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
     var speed by remember { mutableFloatStateOf(1f) }
     var fullscreen by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var speedMenu by remember { mutableStateOf(false) }
+    var aspectMenu by remember { mutableStateOf(false) }
+    var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
+    var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
 
     BackHandler {
         if (fullscreen) {
@@ -70,22 +87,34 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
         while (true) {
             position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
             duration = controller?.duration?.takeIf { it > 0L } ?: 0L
-            delay(500)
+            repeatMode = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
+            shuffleEnabled = controller?.shuffleModeEnabled ?: false
+            delay(400)
+        }
+    }
+
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            delay(4500)
+            controlsVisible = false
         }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
+            factory = { ctx ->
+                PlayerView(ctx).apply {
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    resizeMode = aspectMode
                     setKeepContentOnPlayerReset(true)
                     player = controller
                 }
             },
             modifier = Modifier.fillMaxSize(),
-            update = { it.player = controller }
+            update = {
+                it.player = controller
+                it.resizeMode = aspectMode
+            }
         )
 
         Box(Modifier.fillMaxSize().pointerInput(controller) {
@@ -104,34 +133,108 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
 
         if (controlsVisible) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                Row(
-                    Modifier.fillMaxWidth().background(Color(0xB8000000)).statusBarsPadding()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onClose) { Text("‹", color = Color.White, fontSize = 28.sp) }
-                    Column(Modifier.weight(1f)) {
-                        Text(title, color = Color.White, maxLines = 1)
-                        Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
-                    }
-                    TextButton(onClick = {
-                        controller?.let { player ->
-                            val params = player.trackSelectionParameters
-                            player.trackSelectionParameters = params.buildUpon()
-                                .setTrackTypeDisabled(
-                                    C.TRACK_TYPE_TEXT,
-                                    !params.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
-                                ).build()
+                Column(Modifier.fillMaxWidth().background(Color(0xB8000000))) {
+                    Row(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onClose) { Text("‹", color = Color.White, fontSize = 28.sp) }
+                        Column(Modifier.weight(1f)) {
+                            Text(title, color = Color.White, maxLines = 1)
+                            Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
                         }
-                    }) { Text("SUB", color = accent) }
-                    TextButton(onClick = { fullscreen = !fullscreen; controlsVisible = true }) {
-                        Text(if (fullscreen) "⤢" else "⛶", color = Color.White, fontSize = 20.sp)
+                        TextButton(onClick = { fullscreen = !fullscreen; controlsVisible = true }) {
+                            Text(if (fullscreen) "⤢" else "⛶", color = Color.White, fontSize = 20.sp)
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                controller?.let {
+                                    TrackSelectionDialogBuilder(context, "Аудиодорожка", it, C.TRACK_TYPE_AUDIO)
+                                        .setShowDisableOption(false)
+                                        .setAllowAdaptiveSelections(true)
+                                        .build().show()
+                                }
+                            },
+                            enabled = controller != null
+                        ) { Text("Аудио", color = accent) }
+                        TextButton(
+                            onClick = {
+                                controller?.let {
+                                    TrackSelectionDialogBuilder(context, "Субтитры", it, C.TRACK_TYPE_TEXT)
+                                        .setShowDisableOption(true)
+                                        .setAllowAdaptiveSelections(false)
+                                        .build().show()
+                                }
+                            },
+                            enabled = controller != null
+                        ) { Text("Субтитры", color = accent) }
+                        Box {
+                            TextButton(onClick = { aspectMenu = true }) { Text("Формат кадра", color = accent) }
+                            DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
+                                listOf(
+                                    "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
+                                    "Заполнить" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                                    "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                ).forEach { (label, mode) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = { aspectMode = mode; aspectMenu = false; controlsVisible = true }
+                                    )
+                                }
+                            }
+                        }
+                        TextButton(onClick = {
+                            repeatMode = when (repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+                                Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            controller?.repeatMode = repeatMode
+                        }) {
+                            Text(
+                                when (repeatMode) {
+                                    Player.REPEAT_MODE_ONE -> "Повтор: 1"
+                                    Player.REPEAT_MODE_ALL -> "Повтор: всё"
+                                    else -> "Повтор: выкл."
+                                },
+                                color = accent
+                            )
+                        }
+                        TextButton(onClick = {
+                            shuffleEnabled = !shuffleEnabled
+                            controller?.shuffleModeEnabled = shuffleEnabled
+                        }) { Text(if (shuffleEnabled) "Перемешивание: вкл." else "Перемешивание", color = accent) }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Фоновое воспроизведение", color = Color.White, fontSize = 12.sp)
+                            Text(
+                                if (backgroundPlaybackEnabled) "Продолжать звук после сворачивания" else "При сворачивании видео будет остановлено",
+                                color = Color.LightGray,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Switch(
+                            checked = backgroundPlaybackEnabled,
+                            onCheckedChange = {
+                                onBackgroundPlaybackChange(it)
+                                controlsVisible = true
+                            }
+                        )
                     }
                 }
 
                 Row(
                     Modifier.fillMaxWidth().background(Color(0xB8000000)).navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(formatVideoTime(position), color = Color.White, fontSize = 11.sp)
@@ -144,13 +247,27 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
                             seeking = false
                         },
                         valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
                     )
                     Text("-${formatVideoTime((duration - position).coerceAtLeast(0L))}", color = Color.White, fontSize = 11.sp)
-                    TextButton(onClick = {
-                        speed = if (speed >= 2f) 0.5f else speed + 0.25f
-                        controller?.setPlaybackSpeed(speed)
-                    }) { Text("${String.format(Locale.US, "%.2f", speed)}×", color = accent) }
+                    Box {
+                        TextButton(onClick = { speedMenu = true }) {
+                            Text("${String.format(Locale.US, "%.2f", speed)}×", color = accent)
+                        }
+                        DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
+                            listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f).forEach { value ->
+                                DropdownMenuItem(
+                                    text = { Text(if (value == 1f) "Обычная скорость" else "${value}×") },
+                                    onClick = {
+                                        speed = value
+                                        controller?.setPlaybackSpeed(value)
+                                        speedMenu = false
+                                        controlsVisible = true
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -160,17 +277,20 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FilledTonalButton(
-                    onClick = { controller?.seekBack() },
+                    onClick = { controller?.seekBack(); controlsVisible = true },
                     colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
                 ) { Text("−10") }
                 Button(
-                    onClick = { if (controller?.isPlaying == true) controller.pause() else controller?.play() },
+                    onClick = {
+                        if (controller?.isPlaying == true) controller.pause() else controller?.play()
+                        controlsVisible = true
+                    },
                     modifier = Modifier.size(68.dp),
                     shape = androidx.compose.foundation.shape.CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black)
                 ) { Text(if (controller?.isPlaying == true) "Ⅱ" else "▶", fontSize = 25.sp) }
                 FilledTonalButton(
-                    onClick = { controller?.seekForward() },
+                    onClick = { controller?.seekForward(); controlsVisible = true },
                     colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
                 ) { Text("+10") }
             }
@@ -180,5 +300,10 @@ fun VideoPlayerScreen(controller: MediaController?, title: String, accent: Color
 
 private fun formatVideoTime(ms: Long): String {
     val seconds = (ms / 1000L).coerceAtLeast(0L)
-    return String.format(Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L)
+    val hours = seconds / 3600L
+    return if (hours > 0L) {
+        String.format(Locale.US, "%d:%02d:%02d", hours, (seconds / 60L) % 60L, seconds % 60L)
+    } else {
+        String.format(Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L)
+    }
 }
