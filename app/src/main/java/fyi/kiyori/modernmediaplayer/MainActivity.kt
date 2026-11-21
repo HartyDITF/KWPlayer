@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -78,7 +80,7 @@ private data class PlayerColors(
     val accent: Color, val text: Color, val muted: Color
 )
 
-private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист", "Ещё")
+private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист")
 private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Обзор" to "▤", "Плейлист" to "≡", "Ещё" to "•••")
 
 private fun colorsForSkin(skin: String) = when (skin) {
@@ -245,17 +247,20 @@ private fun KwPlayerScreen(controller: MediaController?) {
         onBackground = colors.text, onSurface = colors.text
     )) {
         Surface(Modifier.fillMaxSize(), color = colors.background) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (skin == "retro") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
+                        Text(if (tab == "Настройки") "Настройки" else if (skin == "retro") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
                             color = colors.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР", color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
+                        Text(if (tab == "Настройки") "ПЕРСОНАЛИЗАЦИЯ И ПАРАМЕТРЫ" else "ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР",
+                        color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
                     }
-                    TextButton(onClick = { showSkins = true }) { Text("Скин", color = colors.accent) }
+                    TextButton(onClick = { tab = if (tab == "Настройки") "Видео" else "Настройки" }) {
+                        Text(if (tab == "Настройки") "←" else "⚙", color = colors.accent, fontSize = 22.sp)
+                    }
                 }
 
                 if (topTabs(skin)) {
@@ -372,7 +377,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             }
                         }
                         else -> {
-                            PageTitle("Ещё", "Настройки и управление плеером", colors)
+                            PageTitle("Настройки", "Внешний вид, воспроизведение и обновления", colors)
                             Panel(skin, colors) {
                                 Text("ТЕКУЩЕЕ ВОСПРОИЗВЕДЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 Text(selectedName ?: "Ничего не воспроизводится", color = colors.text, fontWeight = FontWeight.SemiBold)
@@ -393,9 +398,9 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 }
                             }
                             Panel(skin, colors) {
-                                Text("ОФОРМЛЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text("Скины меняют навигацию, форму и плотность панелей, а не только цвета.", color = colors.muted, fontSize = 12.sp)
-                                ActionButton(colors, "Выбрать оформление") { showSkins = true }
+                                Text("ВНЕШНИЙ ВИД", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Выбери оформление. Каждый скин меняет палитру, форму панелей и расположение навигации.", color = colors.muted, fontSize = 12.sp)
+                                ActionButton(colors, "Настроить оформление") { showSkins = true }
                             }
                             Panel(skin, colors) {
                                 Text("ОБНОВЛЕНИЯ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
@@ -466,7 +471,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     }
                 } else {
                     Text("KIBATO WATCH PLAYER • ${BuildConfig.VERSION_NAME}", color = colors.muted, fontSize = 9.sp,
-                        modifier = Modifier.fillMaxWidth().background(colors.surface).padding(8.dp))
+                        modifier = Modifier.fillMaxWidth().background(colors.surface).navigationBarsPadding().padding(8.dp))
                 }
             }
         }
