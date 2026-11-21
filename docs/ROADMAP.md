@@ -14,7 +14,9 @@ Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checke
 - [ ] Codec test matrix and useful decoder diagnostics.
 
 ## Stage 2 — Library and navigation
-- [x] Video, Audio, Browse, Playlist and More sections.
+- [x] Video, Audio, Browse and Playlist sections.
+- [x] Dedicated settings screen opened from the header gear button.
+- [x] Edge-to-edge layout with status-bar and navigation-bar safe areas.
 - [x] User-selected SAF folders with persisted access.
 - [x] Explicit recursive scan of selected folders.
 - [x] Local video/audio index with filename search and sorting.
