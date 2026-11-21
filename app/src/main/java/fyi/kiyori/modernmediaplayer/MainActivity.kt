@@ -42,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -79,6 +80,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.SideEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -183,6 +187,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     val settingsRepository = remember { KwSettingsRepository(context) }
     val settingsScope = rememberCoroutineScope()
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
+    var backgroundPlaybackEnabled by remember { mutableStateOf(false) }
 
     val colors = colorsForSkin(skin).copy(accent = accentColor)
     SideEffect {
@@ -201,6 +206,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
         settingsRepository.settings.collect { settings ->
             skin = settings.skin
             accentColor = Color(settings.accentArgb)
+            backgroundPlaybackEnabled = settings.backgroundPlaybackEnabled
         }
     }
     LaunchedEffect(context) {
@@ -257,6 +263,20 @@ private fun KwPlayerScreen(controller: MediaController?) {
         }
         controller?.addListener(listener)
         onDispose { controller?.removeListener(listener) }
+    }
+
+    DisposableEffect(context, controller, activePlayerScreen, backgroundPlaybackEnabled) {
+        val owner = context as? LifecycleOwner
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP &&
+                activePlayerScreen == "video" &&
+                !backgroundPlaybackEnabled
+            ) {
+                controller?.pause()
+            }
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
 
     if (showSkins) {
@@ -404,6 +424,19 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             PageTitle("Настройки", "Внешний вид, воспроизведение и обновления", colors)
                             Panel(skin, colors) {
                                 Text("ТЕКУЩЕЕ ВОСПРОИЗВЕДЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Фоновое воспроизведение видео", color = colors.text, fontSize = 13.sp)
+                                        Text("По умолчанию выключено. Переключатель также доступен в видеоплеере.", color = colors.muted, fontSize = 10.sp)
+                                    }
+                                    Switch(
+                                        checked = backgroundPlaybackEnabled,
+                                        onCheckedChange = { enabled ->
+                                            backgroundPlaybackEnabled = enabled
+                                            settingsScope.launch { settingsRepository.setBackgroundPlaybackEnabled(enabled) }
+                                        }
+                                    )
+                                }
                                 Text(selectedName ?: "Ничего не воспроизводится", color = colors.text, fontWeight = FontWeight.SemiBold)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     TextButton(onClick = { if (isPlaying) controller?.pause() else controller?.play() }) {
@@ -506,7 +539,17 @@ private fun KwPlayerScreen(controller: MediaController?) {
                 }
             } else if (activePlayerScreen == "video") {
                 Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                    VideoPlayerScreen(controller, selectedName ?: "Видео", colors.accent) { activePlayerScreen = "library" }
+                    VideoPlayerScreen(
+                            controller = controller,
+                            title = selectedName ?: "Видео",
+                            accent = colors.accent,
+                            backgroundPlaybackEnabled = backgroundPlaybackEnabled,
+                            onBackgroundPlaybackChange = { enabled ->
+                                backgroundPlaybackEnabled = enabled
+                                settingsScope.launch { settingsRepository.setBackgroundPlaybackEnabled(enabled) }
+                            },
+                            onClose = { activePlayerScreen = "library" }
+                        )
                 }
             }
         }
