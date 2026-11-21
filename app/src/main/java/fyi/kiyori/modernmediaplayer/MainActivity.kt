@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -276,9 +277,9 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (tab == "Настройки") "Настройки" else if (skin == "retro") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
+                        Text(if (tab == "Настройки") "Настройки" else if (skin == "retro" || skin == "winamp") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
                             color = colors.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text(if (tab == "Настройки") "ПЕРСОНАЛИЗАЦИЯ И ПАРАМЕТРЫ" else "ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР",
+                        Text(if (tab == "Настройки") "ПЕРСОНАЛИЗАЦИЯ И ПАРАМЕТРЫ" else if (skin == "winamp") "WINAMP MODERN SKIN • LOCAL MEDIA" else "ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР",
                         color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
                     }
                     TextButton(onClick = { tab = if (tab == "Настройки") "Видео" else "Настройки" }) {
@@ -329,7 +330,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             MediaList(
                                 items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites),
                                 favorites = favorites, colors = colors, skin = skin,
-                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = false; activePlayerScreen = "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
                             )
                             TextButton(onClick = { openFile.launch(arrayOf("audio/*")) }) { Text("Открыть аудиофайл", color = colors.accent) }
@@ -367,7 +368,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 Text("ИЗБРАННОЕ", color = colors.accent, fontWeight = FontWeight.Bold)
                                 MediaList(
                                     media.filter { favorites.contains(it.uri.toString()) }, favorites, colors, skin,
-                                    onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                    onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                     onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
                                 )
                             }
@@ -500,7 +501,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
             if (activePlayerScreen == "audio") {
                 Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
                     androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = colors.background) {
-                        NowPlayingScreen(controller, selectedName ?: "KW Player", colors.accent) { activePlayerScreen = "library" }
+                        NowPlayingScreen(controller, selectedName ?: "KW Player", colors.accent, colors.background, colors.surface) { activePlayerScreen = "library" }
                     }
                 }
             } else if (activePlayerScreen == "video") {
@@ -613,21 +614,56 @@ private fun MediaList(
     if (items.isEmpty()) {
         Text("Файлы не найдены. Добавь папку в разделе «Обзор» и запусти сканирование.", color = colors.muted, fontSize = 12.sp)
     } else {
-        items.take(500).forEach { item ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onPlay(item) }
-                    .background(colors.surface, skinShape(skin)).padding(horizontal = 10.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(Modifier.size(38.dp).background(colors.raised, skinShape(skin)), contentAlignment = Alignment.Center) {
-                    Text(if (item.isVideo) "▶" else "♫", color = colors.accent, fontSize = 17.sp)
-                }
-                Column(Modifier.weight(1f).padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(item.name, color = colors.text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (item.size > 0) formatBytes(item.size) else item.mimeType, color = colors.muted, fontSize = 10.sp)
-                }
-                TextButton(onClick = { onFavorite(item) }) {
-                    Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 19.sp)
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(items.take(500), key = { it.uri.toString() }) { item ->
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(colors.surface, skinShape(skin))
+                        .clickable { onPlay(item) }
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MediaArtwork(
+                        item = item,
+                        modifier = Modifier.size(if (item.isVideo) 116.dp else 68.dp, 68.dp),
+                        accent = colors.accent,
+                        surface = colors.raised
+                    )
+                    Column(
+                        Modifier.weight(1f).padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            item.name,
+                            color = colors.text,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            listOfNotNull(
+                                if (item.size > 0) formatBytes(item.size) else null,
+                                item.mimeType.substringAfter('/').uppercase(Locale.ROOT)
+                            ).joinToString(" · "),
+                            color = colors.muted,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (item.isVideo) {
+                            Text("ВИДЕО", color = colors.accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("▶", color = colors.accent, fontSize = 17.sp)
+                        TextButton(onClick = { onFavorite(item) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                            Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 19.sp)
+                        }
+                    }
                 }
             }
         }
