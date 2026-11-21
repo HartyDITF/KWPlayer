@@ -2,42 +2,41 @@
 
 ## Product vision
 
-KW Player (Kibato Watch Player) is a free, local-first Android media player with practical library navigation and selectable interface layouts.
+KW Player (Kibato Watch Player) is a free, local-first Android media player with a Winamp Modern-inspired interface and VLC-style practical playback.
 
 ## Principles
 
 1. Stable playback and battery efficiency first.
-2. Local media stays on the device.
-3. Do not claim codec support without real-device testing.
-4. Keep the default interface familiar and functional.
-5. Skins change layout and component presentation, not just colors.
+2. Media stays on the device. No accounts, ads, analytics, telemetry or cloud upload.
+3. Network access is limited to the optional GitHub release checker and APK download.
+4. No codec support is claimed without physical-device testing.
+5. Skins are safe presentation presets and never execute imported code.
 
 ## Implemented foundation
 
-- Media3 playback through a MediaSessionService.
-- Open individual audio/video files through Android's document picker.
-- Add folders through SAF and explicitly scan selected folders.
-- Separate Video and Audio library lists.
-- Search by filename, sort by name or modified date.
-- Favorites and recently opened history.
-- Current Media3 queue display.
-- Playback speed control.
+- Kotlin, Jetpack Compose Material 3 and AndroidX Media3.
+- Playback owned by MediaSessionService; audio focus and noisy-headset handling are configured through ExoPlayer.
+- Open local audio/video files and select folders through SAF.
+- Explicit recursive scan of user-selected folders.
+- Video/audio lists, filename search, sorting, favorites and recently opened history.
+- Room database stores the scanned media index and resume positions; legacy SharedPreferences index remains available for migration/fallback.
+- Preferences DataStore stores skin and accent settings and migrates the former skin preference.
+- Dedicated audio now-playing overlay with seek, shuffle, previous/next, playback toggle and device-supported equalizer bands.
+- Dedicated landscape video overlay with Media3 PlayerView, seek, ±10 second controls, subtitle-track toggle and playback speed.
+- Built-in Modern Dark, Classic Orange, Light and AMOLED Black theme choices.
+- Glance playback widget with previous/play-pause/next controls.
 - In-app GitHub release check, APK download and installer handoff.
-- Standard bottom navigation; Winamp Modern and Classic Retro top navigation.
-- Built-in Standard, Winamp Modern, AMOLED Black, Classic Retro and Neon appearance presets with distinct panel shapes/density.
 
-The library index currently uses local SharedPreferences JSON. Scanning is user-triggered and only covers folders selected by the user.
+## Not yet complete or device-verified
 
-## Still planned / not device-verified
+- Full metadata artwork and true 24-band spectrum visualization. Android Visualizer requires an explicit RECORD_AUDIO permission flow; no fabricated spectrum animation is shown.
+- Full subtitle file picker, audio-track picker, aspect-ratio controls, lock-screen touch lock and brightness/volume gestures.
+- Folder widget configuration and folder-content widget layouts.
+- MediaStore-wide discovery outside user-selected SAF folders.
+- Editable persistent playlists, complete queue editor and per-item queue persistence.
+- Resume-position behavior across firmware/process-kill scenarios.
+- Decoder/codec compatibility matrix, battery/thermal measurements and HyperOS notification/widget validation.
 
-- Room database and per-file resume positions.
-- Saved editable playlists and queue management.
-- Subtitle file selection and audio/subtitle track picker UI.
-- Picture-in-picture, fullscreen/orientation polish and gesture controls.
-- Thumbnail generation and rich metadata.
-- Home-screen widgets.
-- Device/codec compatibility matrix and battery/thermal measurements.
+## Privacy and storage
 
-## Privacy
-
-No ads, analytics, telemetry, accounts or upload of media names and playback history. The optional updater connects to GitHub Releases.
+Library, favorites, history, settings and playback positions are local. Scanning is user-triggered. No permanent media polling or background directory watcher is used.

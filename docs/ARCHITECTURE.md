@@ -1,49 +1,46 @@
 # KW Player architecture
 
-## Goals
-
-Keep playback independent from presentation, minimize idle work and APK size, and make file access explicit and user-controlled.
-
 ## Technology
 
 | Area | Implementation |
 |---|---|
-| Language / UI | Kotlin, Jetpack Compose, Material 3 |
-| Playback | AndroidX Media3 ExoPlayer, MediaSessionService and MediaController |
-| File access | Storage Access Framework (SAF), with MediaStore discovery planned |
-| Library index | Room (migration from the existing SharedPreferences JSON index is pending) |
-| Settings | Preferences DataStore (migration from existing SharedPreferences is pending) |
-| Widgets | Jetpack Glance AppWidget (widget implementations are pending) |
+| UI | Kotlin, Jetpack Compose, Material 3 |
+| Playback | AndroidX Media3 ExoPlayer, MediaSessionService, MediaController |
+| Local file access | Storage Access Framework |
+| Library index | Room |
+| Settings | Preferences DataStore with SharedPreferences migration |
+| Home screen | Jetpack Glance player widget |
 | CI | GitHub Actions |
 
-## Playback
+## Playback ownership
 
-PlaybackService owns ExoPlayer and MediaSession. The Activity connects through MediaController. Media3 handles playback and system media controls. The Activity does not own the playback engine.
+PlaybackService owns ExoPlayer and MediaSession. The Activity connects through MediaController. ExoPlayer is configured to manage audio focus and react to audio becoming noisy (for example, wired headphones being disconnected). The AndroidX Media3 session service provides the system media notification and lock-screen transport controls.
 
-The service should be active only for an active playback session. Do not start it for idle library browsing.
+The service owns the player lifecycle. The UI never creates a second player. The equalizer attaches to the player's audio session and uses the band capabilities exposed by the device.
 
-## SAF library
+## Library and persistence
 
-- Users add folders with ACTION_OPEN_DOCUMENT_TREE.
-- Persist the granted URI permission; never assume absolute filesystem paths.
-- Scanning is started only by an explicit user action.
-- MediaLibrary walks selected document trees through DocumentsContract and indexes audio/video MIME types.
-- The current index stores URI, display name, MIME type, size and modified time in SharedPreferences JSON.
-- Favorites and the most recent 100 opened items are stored locally.
-- If access is revoked or a provider fails, skip the unavailable entry and continue where possible.
-- Room entities and migration must be implemented before claiming Room-backed persistence.
+- Users grant folder access through ACTION_OPEN_DOCUMENT_TREE.
+- Persistable URI permissions are retained; absolute filesystem paths are not assumed.
+- Scanning starts only after explicit user action.
+- SAF traversal is bounded by a maximum depth and visited-document set.
+- Room stores URI, display name, MIME type, size, modified time and resume position.
+- The existing JSON SharedPreferences index remains as a migration/fallback source for older installs.
+- Favorites and history continue to use the existing local preferences until their Room migration is completed.
+- Unavailable or revoked document providers are skipped without aborting the full scan.
 
-## UI and skins
+## Settings and skins
 
-The design token foundation lives in core/design/theme. The default palette follows the KW Player dark palette and uses orange as the initial accent. Saved accent selection and complete screen migration are pending.
+Preferences DataStore migrates the existing skin preference and stores the selected skin and accent color. Built-in skins are safe presentation presets. Imported skin files must never execute code.
 
-Skins are built-in safe UI presets. Do not load or execute arbitrary code from skin files.
+## Widgets
+
+The Glance player widget sends explicit local broadcasts to a receiver that connects to the MediaSession and issues transport controls. Widget updates are event-driven; there is no periodic polling.
 
 ## Performance and privacy
 
-- No background folder watcher or periodic media scan.
-- No service while idle.
-- Do not load complete media files into memory.
-- No analytics, ads, accounts or media uploads.
-- Network access is reserved for the optional GitHub release checker and APK download.
-- Artwork and thumbnails must use bounded caches if added later.
+- No background folder watcher or periodic scan.
+- No player instance while browsing; the MediaSessionService owns playback.
+- Media files are streamed by Media3, not loaded fully into RAM.
+- No analytics, ads, accounts, telemetry or media uploads.
+- Network access is reserved for GitHub Releases update checks and APK downloads.

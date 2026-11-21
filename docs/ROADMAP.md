@@ -1,60 +1,39 @@
 # Development roadmap
 
-Status labels: **Not started**, **In progress**, **Blocked**, **Done**. A checked implementation item is not a claim of successful physical-device testing.
+A successful CI build proves compilation only. Device behavior must be tested separately.
 
-## Stage 0 — Foundation
+## Foundation and playback
 - [x] Kotlin / Compose project and GitHub Actions build.
-- [x] Media3 playback baseline.
-- [x] Central KW Player dark design-token palette.
-- [x] Add Room, Preferences DataStore and Glance dependencies.
+- [x] Media3 ExoPlayer through MediaSessionService and MediaController.
+- [x] Audio focus and noisy-headset handling.
+- [x] Local file open and SAF folder selection.
+- [x] User-triggered recursive scan, search, sorting, favorites and history.
+- [x] Room media index and resume-position storage foundation.
+- [x] Preferences DataStore with migration from the previous skin preference.
+- [x] Audio now-playing screen with transport controls, seek and device-supported equalizer.
+- [x] Landscape video screen with Media3 PlayerView, seek, skip and speed controls.
+- [x] Glance playback widget with transport controls.
+- [ ] Confirm notification and lock-screen controls on POCO X8 Pro Max and POCO M8 5G.
+- [ ] Verify resume positions after force-stop, process death and firmware background restrictions.
+- [ ] Verify audio focus and headset disconnect behavior on devices.
 
-## Stage 1 — Playback foundation
-- [x] Open a local audio or video file through SAF.
-- [x] MediaSessionService and Android media controls integration.
-- [ ] Verify background playback and HyperOS media surfaces on devices.
-- [ ] Fullscreen/orientation handling and gesture controls.
-- [ ] Codec test matrix and useful decoder diagnostics.
-- [ ] Queue, shuffle, repeat and resume positions.
+## Library and player quality
+- [ ] MediaStore discovery and metadata/artwork.
+- [ ] Full queue editor, saved playlists, shuffle/repeat persistence.
+- [ ] Subtitle file picker, audio/subtitle track selection and subtitle styling.
+- [ ] Picture-in-picture, video aspect-ratio menu, touch lock and brightness/volume gestures.
+- [ ] True audio spectrum with explicit permission flow.
+- [ ] Device/codec compatibility test matrix.
 
-## Stage 2 — Library and navigation
-- [x] Video, Audio, Browse and Playlist sections.
-- [x] Dedicated settings screen opened from the header gear button.
-- [x] Edge-to-edge layout with status-bar and navigation-bar safe areas.
-- [x] User-selected SAF folders with persisted access.
-- [x] Explicit recursive scan of selected folders.
-- [x] Local video/audio index with filename search and sorting.
-- [x] Favorites and recently opened history.
-- [ ] MediaStore discovery.
-- [ ] Room entities, DAO, database and migration from the existing local index.
-- [ ] Saved playlists and full queue editing.
+## Design and widgets
+- [x] Central dark design tokens and accent color.
+- [x] Modern Dark, Classic Orange, Light and AMOLED Black theme choices.
+- [ ] Finish typography assets (Inter and Share Tech Mono) and per-skin layout refinement.
+- [ ] Safe skin import format.
+- [ ] Folder widgets and configurable folder widget setup.
+- [ ] Validate widget resize behavior and event-driven refresh.
 
-## Stage 3 — Playback quality
-- [x] Playback speed control.
-- [ ] Subtitle file selection and audio/subtitle track selection UI.
-- [ ] Picture-in-picture.
-- [ ] Fullscreen controls and gestures.
-- [ ] Verify behavior across common containers/codecs on real devices.
-
-## Stage 4 — Skins
-- [x] Existing Standard, Winamp Modern, AMOLED Black, Classic Retro and Neon presets.
-- [x] Centralized base color tokens.
-- [ ] Inter / Share Tech Mono font assets and typography setup.
-- [ ] Accent color persistence with DataStore.
-- [ ] Refine skin-specific player controls and accessibility.
-- [ ] Safe skin import format and reduced-motion option.
-
-## Stage 5 — Widgets and efficiency
-- [ ] Folder shortcut widgets.
-- [ ] Playback control widget.
-- [ ] Event-driven widget refresh.
-- [ ] Validate POCO X8 Pro Max and POCO M8 5G.
-- [ ] Measure battery, memory, CPU and thermals.
-
-## Stage 6 — Release
-- [x] Signed v0.3.0 release and in-app updater foundation.
-- [ ] Build and test the next signed release.
-- [ ] Record physical-device test results and known limitations.
-
-## Release rule
-
-CI success proves compilation only. It does not prove playback quality, firmware integration, codec compatibility or battery behavior.
+## Release quality
+- [x] GitHub release checker and signed APK installer handoff.
+- [ ] Build signed release APK after debug CI passes.
+- [ ] Physical-device playback, battery, thermal and long-session testing.
