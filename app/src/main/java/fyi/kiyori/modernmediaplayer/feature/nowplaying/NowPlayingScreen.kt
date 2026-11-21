@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.session.MediaController
+import androidx.media3.common.Player
 import fyi.kiyori.modernmediaplayer.core.playback.PlaybackEqualizer
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -28,10 +29,11 @@ import java.util.Locale
  val range = PlaybackEqualizer.levelRange()
  Column(Modifier.fillMaxSize().background(Color(0xFF101318)).padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { TextButton(onClick=onClose) { Text("Свернуть", color=accent) }; Spacer(Modifier.weight(1f)); Text("СЕЙЧАС ИГРАЕТ", color=Color(0xFF9BA4B5), fontSize=10.sp); Spacer(Modifier.weight(1f)); TextButton(onClick={ controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled } }) { Text("SHUFFLE", color=accent) } }
-  Card(Modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=Color(0xFF0B0D11))) { Column(Modifier.padding(18.dp)) { Text(formatTime(position), color=Color(0xFF5CF2CF), fontSize=44.sp, fontWeight=FontWeight.Bold); Text(title.uppercase(Locale.ROOT), color=Color(0xFF5CF2CF), maxLines=1, overflow=TextOverflow.Ellipsis); Text("STEREO · локальный файл", color=Color(0xFF9BA4B5), fontSize=10.sp) } }
+  Card(Modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=Color(0xFF0B0D11))) { Column(Modifier.padding(18.dp)) { Text(formatTime(position), color=Color(0xFF5CF2CF), fontSize=44.sp, fontWeight=FontWeight.Bold); Text(title.uppercase(Locale.ROOT), color=Color(0xFF5CF2CF), maxLines=1, overflow=TextOverflow.Ellipsis); Text("ЛОКАЛЬНЫЙ ФАЙЛ · СПЕКТР НЕ АКТИВИРОВАН", color=Color(0xFF9BA4B5), fontSize=9.sp) } }
   Box(Modifier.size(104.dp).background(Color(0xFF1A1E26), RoundedCornerShape(16.dp)), contentAlignment=Alignment.Center) { Text("KW", color=accent, fontSize=32.sp, fontWeight=FontWeight.Black) }
   Text(title, color=Color(0xFFE9ECF2), fontSize=20.sp, fontWeight=FontWeight.Bold, maxLines=2, overflow=TextOverflow.Ellipsis)
   Text(artist, color=Color(0xFF9BA4B5), fontSize=13.sp)
+  controller?.mediaMetadata?.albumTitle?.toString()?.takeIf { it.isNotBlank() }?.let { Text(it, color=Color(0xFF9BA4B5), fontSize=11.sp) }
   Column(Modifier.fillMaxWidth()) {
    val max = duration.coerceAtLeast(1L).toFloat()
    Slider(value=if(seeking) preview.coerceIn(0f,max) else position.toFloat().coerceIn(0f,max), onValueChange={ preview=it; seeking=true }, onValueChangeFinished={ controller?.seekTo(preview.toLong()); seeking=false }, valueRange=0f..max)
@@ -41,6 +43,7 @@ import java.util.Locale
    TextButton(onClick={ controller?.seekToPreviousMediaItem() }) { Text("PREV", color=Color.LightGray) }
    Button(onClick={ if(controller?.isPlaying==true) controller.pause() else controller?.play() }, modifier=Modifier.size(72.dp), shape=RoundedCornerShape(50), colors=ButtonDefaults.buttonColors(containerColor=accent, contentColor=Color(0xFF101318))) { Text(if(controller?.isPlaying==true) "Ⅱ" else "▶", fontSize=24.sp) }
    TextButton(onClick={ controller?.seekToNextMediaItem() }) { Text("NEXT", color=Color.LightGray) }
+   TextButton(onClick={ controller?.let { p -> p.repeatMode = when(p.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF } } }) { Text(when(controller?.repeatMode) { Player.REPEAT_MODE_ALL -> "REPEAT ALL"; Player.REPEAT_MODE_ONE -> "REPEAT ONE"; else -> "REPEAT OFF" }, color=accent, fontSize=10.sp) }
   }
   Card(Modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=Color(0xFF1A1E26))) { Column(Modifier.padding(12.dp)) {
    Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) { Text("ЭКВАЛАЙЗЕР", color=Color.White, fontWeight=FontWeight.Bold); Text(if(bands.isEmpty()) "Недоступен" else "Устройство", color=Color(0xFF9BA4B5), fontSize=10.sp) }

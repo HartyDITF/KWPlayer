@@ -25,6 +25,9 @@ class PlaybackService : MediaSessionService() {
         }
         PlaybackEqualizer.attach(player.audioSessionId)
         player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                PlaybackEqualizer.attach(audioSessionId)
+            }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) persistPosition(player)
             }

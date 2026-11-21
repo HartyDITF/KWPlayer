@@ -77,6 +77,7 @@ import java.util.Locale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.SideEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -183,6 +184,14 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
 
     val colors = colorsForSkin(skin).copy(accent = accentColor)
+    SideEffect {
+        (context as? Activity)?.window?.let { window ->
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = skin == "light"
+                isAppearanceLightNavigationBars = skin == "light"
+            }
+        }
+    }
     val shape = skinShape(skin)
     val favorites = MediaLibrary.favorites(context)
     val history = MediaLibrary.history(context)
@@ -256,7 +265,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
         )
     }
 
-    KwTheme(accent = colors.accent) {
+    KwTheme(accent = colors.accent, light = skin == "light") {
         Surface(Modifier.fillMaxSize(), color = colors.background) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(
@@ -518,11 +527,20 @@ private fun startLibraryItem(
 ) {
     onSelected(item)
     MediaLibrary.addHistory(context, item.uri.toString())
-    controller?.let {
-        it.setMediaItem(MediaItem.Builder().setUri(item.uri)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(item.name).setArtist("KW Player").build()).build())
-        it.prepare()
-        it.play()
+    controller?.let { player ->
+        val queue = MediaLibrary.loadItems(context)
+            .filter { if (item.isAudio) it.isAudio else it.isVideo }
+            .take(500)
+        val safeQueue = if (queue.any { it.uri == item.uri }) queue else listOf(item)
+        val startIndex = safeQueue.indexOfFirst { it.uri == item.uri }.coerceAtLeast(0)
+        val mediaItems = safeQueue.map { entry ->
+            MediaItem.Builder().setUri(entry.uri)
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(entry.name).setArtist("KW Player").build())
+                .build()
+        }
+        player.setMediaItems(mediaItems, startIndex, 0L)
+        player.prepare()
+        player.play()
     }
 }
 
