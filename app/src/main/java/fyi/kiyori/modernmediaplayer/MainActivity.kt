@@ -74,6 +74,17 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
 import java.util.Locale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import fyi.kiyori.modernmediaplayer.data.settings.KwSettingsRepository
+import fyi.kiyori.modernmediaplayer.feature.nowplaying.NowPlayingScreen
+import fyi.kiyori.modernmediaplayer.feature.video.VideoPlayerScreen
+import fyi.kiyori.modernmediaplayer.feature.themes.ThemesDialog
+import fyi.kiyori.modernmediaplayer.core.design.theme.KwTheme
 
 private data class PlayerColors(
     val background: Color, val surface: Color, val raised: Color,
@@ -85,7 +96,8 @@ private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Об
 
 private fun colorsForSkin(skin: String) = when (skin) {
     "winamp" -> PlayerColors(Color(0xFF090E18), Color(0xFF18283B), Color(0xFF243D58), Color(0xFF62C4FF), Color(0xFFF1F6FC), Color(0xFF9AAABD))
-    "amoled" -> PlayerColors(Color.Black, Color(0xFF080808), Color(0xFF171717), Color(0xFF80CBC4), Color.White, Color(0xFFAAAAAA))
+    "amoled" -> PlayerColors(Color.Black, Color(0xFF080808), Color(0xFF171717), Color(0xFF5CF2CF), Color.White, Color(0xFFAAAAAA))
+    "light" -> PlayerColors(Color(0xFFF2F4F7), Color.White, Color(0xFFE5E8ED), Color(0xFFCF6812), Color(0xFF171A20), Color(0xFF5D6674))
     "retro" -> PlayerColors(Color(0xFF17130D), Color(0xFF302719), Color(0xFF493A25), Color(0xFFE6B85C), Color(0xFFFFF3D8), Color(0xFFC4B28F))
     "neon" -> PlayerColors(Color(0xFF10091B), Color(0xFF21132F), Color(0xFF352047), Color(0xFFFF62C7), Color(0xFFFFF2FC), Color(0xFFC0A8C2))
     else -> PlayerColors(Color(0xFF101419), Color(0xFF1B222B), Color(0xFF27323E), Color(0xFF78B9F2), Color(0xFFF3F6FA), Color(0xFFAAB5C2))
@@ -163,18 +175,37 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var updateBusy by remember { mutableStateOf(false) }
     var showSkins by remember { mutableStateOf(false) }
+    var activePlayerScreen by remember { mutableStateOf("library") }
+    var isVideoItem by remember { mutableStateOf(false) }
+    var accentColor by remember { mutableStateOf(Color(0xFFFF8F1F)) }
+    val settingsRepository = remember { KwSettingsRepository(context) }
+    val settingsScope = rememberCoroutineScope()
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
 
-    val colors = colorsForSkin(skin)
+    val colors = colorsForSkin(skin).copy(accent = accentColor)
     val shape = skinShape(skin)
     val favorites = MediaLibrary.favorites(context)
     val history = MediaLibrary.history(context)
+
+    LaunchedEffect(settingsRepository) {
+        settingsRepository.settings.collect { settings ->
+            skin = settings.skin
+            accentColor = Color(settings.accentArgb)
+        }
+    }
+    LaunchedEffect(context) {
+        val stored = withContext(Dispatchers.IO) { MediaLibrary.loadFromRoom(context) }
+        if (stored.isNotEmpty()) media = stored
+        else withContext(Dispatchers.IO) { MediaLibrary.saveToRoom(context, media) }
+    }
 
     val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             catch (_: SecurityException) {}
             val name = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':') ?: "Медиафайл"
+            isVideoItem = context.contentResolver.getType(uri)?.startsWith("video/") == true
+            activePlayerScreen = if (isVideoItem) "video" else "audio"
             playItem(uri, name, controller) { selectedUri = it; selectedName = name; playbackError = null }
             MediaLibrary.addHistory(context, uri.toString())
         }
@@ -216,36 +247,16 @@ private fun KwPlayerScreen(controller: MediaController?) {
     }
 
     if (showSkins) {
-        AlertDialog(
-            onDismissRequest = { showSkins = false },
-            title = { Text("Оформление") },
-            text = {
-                Column {
-                    listOf(
-                        "standard" to "Standard — VLC style",
-                        "winamp" to "Winamp Modern",
-                        "amoled" to "AMOLED Black",
-                        "retro" to "Classic Retro",
-                        "neon" to "Neon"
-                    ).forEach { (key, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(skin == key, onClick = {
-                                skin = key
-                                prefs.edit().putString("skin", key).apply()
-                            })
-                            Text(label)
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showSkins = false }) { Text("Готово") } }
+        ThemesDialog(
+            selected = skin,
+            selectedAccent = accentColor,
+            onSelect = { key -> skin = key; settingsScope.launch { settingsRepository.setSkin(key) } },
+            onAccent = { color -> accentColor = color; settingsScope.launch { settingsRepository.setAccent(color.value.toLong().toInt()) } },
+            onDismiss = { showSkins = false }
         )
     }
 
-    MaterialTheme(colorScheme = darkColorScheme(
-        primary = colors.accent, background = colors.background, surface = colors.surface,
-        onBackground = colors.text, onSurface = colors.text
-    )) {
+    KwTheme(accent = colors.accent) {
         Surface(Modifier.fillMaxSize(), color = colors.background) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(
@@ -295,7 +306,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             MediaList(
                                 items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites),
                                 favorites = favorites, colors = colors, skin = skin,
-                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
                             )
                             TextButton(onClick = { openFile.launch(arrayOf("video/*")) }) { Text("Открыть видеофайл", color = colors.accent) }
@@ -446,7 +457,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             }
                         }
                     }
-                    if (selectedUri != null && tab != "Видео" && tab != "Аудио") {
+                    if (selectedUri != null && tab != "Видео" && tab != "Аудио" && activePlayerScreen == "library") {
                         MiniPlayback(colors, selectedName, isPlaying, onToggle = {
                             if (isPlaying) controller?.pause() else controller?.play()
                         }, onStop = {
@@ -472,6 +483,17 @@ private fun KwPlayerScreen(controller: MediaController?) {
                 } else {
                     Text("KIBATO WATCH PLAYER • ${BuildConfig.VERSION_NAME}", color = colors.muted, fontSize = 9.sp,
                         modifier = Modifier.fillMaxWidth().background(colors.surface).navigationBarsPadding().padding(8.dp))
+                }
+            }
+            if (activePlayerScreen == "audio") {
+                Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                    androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = colors.background) {
+                        NowPlayingScreen(controller, selectedName ?: "KW Player", colors.accent) { activePlayerScreen = "library" }
+                    }
+                }
+            } else if (activePlayerScreen == "video") {
+                Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                    VideoPlayerScreen(controller, selectedName ?: "Видео", colors.accent) { activePlayerScreen = "library" }
                 }
             }
         }

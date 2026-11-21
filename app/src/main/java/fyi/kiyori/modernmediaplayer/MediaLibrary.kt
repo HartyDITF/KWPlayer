@@ -7,6 +7,10 @@ import android.provider.DocumentsContract
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.ArrayDeque
+import fyi.kiyori.modernmediaplayer.data.database.KwDatabase
+import fyi.kiyori.modernmediaplayer.data.database.MediaEntity
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
 
 data class LocalMediaItem(
     val uri: Uri,
@@ -107,6 +111,7 @@ object MediaLibrary {
         }
         val result = found.values.sortedBy { it.name.lowercase() }
         saveItems(context, result)
+        runCatching { runBlocking(Dispatchers.IO) { KwDatabase.get(context).mediaDao().upsertAll(result.map { it.toEntity() }) } }
         return result
     }
 
@@ -129,6 +134,15 @@ object MediaLibrary {
             }
         }.getOrDefault(emptyList())
     }
+
+    suspend fun loadFromRoom(context: Context): List<LocalMediaItem> = KwDatabase.get(context).mediaDao().getAll().map { it.toLocalMediaItem() }
+
+    suspend fun saveToRoom(context: Context, items: List<LocalMediaItem>) {
+        KwDatabase.get(context).mediaDao().upsertAll(items.map { it.toEntity() })
+    }
+
+    private fun LocalMediaItem.toEntity() = MediaEntity(uri.toString(), name, mimeType, size, modified)
+    private fun MediaEntity.toLocalMediaItem() = LocalMediaItem(Uri.parse(uri), name, mimeType, size, modified)
 
     private fun saveItems(context: Context, items: List<LocalMediaItem>) {
         val array = JSONArray()
