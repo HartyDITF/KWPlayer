@@ -10,24 +10,35 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +46,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -59,16 +72,33 @@ import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
+import java.util.Locale
 
-private data class PlayerColors(val background: Color, val surface: Color, val raised: Color, val accent: Color, val text: Color, val muted: Color)
+private data class PlayerColors(
+    val background: Color, val surface: Color, val raised: Color,
+    val accent: Color, val text: Color, val muted: Color
+)
+
+private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист", "Ещё")
+private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Обзор" to "▤", "Плейлист" to "≡", "Ещё" to "•••")
 
 private fun colorsForSkin(skin: String) = when (skin) {
     "winamp" -> PlayerColors(Color(0xFF090E18), Color(0xFF18283B), Color(0xFF243D58), Color(0xFF62C4FF), Color(0xFFF1F6FC), Color(0xFF9AAABD))
-    "amoled" -> PlayerColors(Color.Black, Color(0xFF101010), Color(0xFF202020), Color(0xFF80CBC4), Color.White, Color(0xFFAAAAAA))
+    "amoled" -> PlayerColors(Color.Black, Color(0xFF080808), Color(0xFF171717), Color(0xFF80CBC4), Color.White, Color(0xFFAAAAAA))
     "retro" -> PlayerColors(Color(0xFF17130D), Color(0xFF302719), Color(0xFF493A25), Color(0xFFE6B85C), Color(0xFFFFF3D8), Color(0xFFC4B28F))
     "neon" -> PlayerColors(Color(0xFF10091B), Color(0xFF21132F), Color(0xFF352047), Color(0xFFFF62C7), Color(0xFFFFF2FC), Color(0xFFC0A8C2))
     else -> PlayerColors(Color(0xFF101419), Color(0xFF1B222B), Color(0xFF27323E), Color(0xFF78B9F2), Color(0xFFF3F6FA), Color(0xFFAAB5C2))
 }
+
+private fun skinShape(skin: String) = when (skin) {
+    "amoled" -> RoundedCornerShape(0.dp)
+    "retro" -> RoundedCornerShape(3.dp)
+    "neon" -> RoundedCornerShape(22.dp)
+    "winamp" -> RoundedCornerShape(8.dp)
+    else -> RoundedCornerShape(14.dp)
+}
+
+private fun topTabs(skin: String) = skin == "winamp" || skin == "retro"
 
 class MainActivity : ComponentActivity() {
     private val controllerState = mutableStateOf<MediaController?>(null)
@@ -95,7 +125,8 @@ class MainActivity : ComponentActivity() {
             val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
             controllerFuture = MediaController.Builder(this, token).buildAsync().also { future ->
                 future.addListener({
-                    try { controllerState.value = future.get() } catch (_: Exception) { controllerState.value = null }
+                    try { controllerState.value = future.get() }
+                    catch (_: Exception) { controllerState.value = null }
                 }, MoreExecutors.directExecutor())
             }
         }
@@ -112,11 +143,16 @@ class MainActivity : ComponentActivity() {
 @androidx.compose.runtime.Composable
 private fun KwPlayerScreen(controller: MediaController?) {
     val context = LocalContext.current
-    val preferences = remember { context.getSharedPreferences("kw_player_settings", android.content.Context.MODE_PRIVATE) }
-    var skin by remember { mutableStateOf(preferences.getString("skin", "standard") ?: "standard") }
-    var showSettings by remember { mutableStateOf(false) }
-    val colors = colorsForSkin(skin)
-
+    val prefs = remember { context.getSharedPreferences("kw_player_settings", android.content.Context.MODE_PRIVATE) }
+    var skin by remember { mutableStateOf(prefs.getString("skin", "standard") ?: "standard") }
+    var tab by remember { mutableStateOf("Видео") }
+    var media by remember { mutableStateOf(MediaLibrary.loadItems(context)) }
+    var folders by remember { mutableStateOf(MediaLibrary.folders(context)) }
+    var query by remember { mutableStateOf("") }
+    var sortNewest by remember { mutableStateOf(false) }
+    var favoritesOnly by remember { mutableStateOf(false) }
+    var scanBusy by remember { mutableStateOf(false) }
+    var scanMessage by remember { mutableStateOf("Добавь папку и запусти сканирование.") }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var selectedName by remember { mutableStateOf<String?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -125,182 +161,453 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var availableRelease by remember { mutableStateOf<KwRelease?>(null) }
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var updateBusy by remember { mutableStateOf(false) }
+    var showSkins by remember { mutableStateOf(false) }
+    var playbackSpeed by remember { mutableFloatStateOf(1f) }
 
-    val openVideo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val colors = colorsForSkin(skin)
+    val shape = skinShape(skin)
+    val favorites = MediaLibrary.favorites(context)
+    val history = MediaLibrary.history(context)
+
+    val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) {}
-            selectedUri = uri
-            selectedName = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':') ?: "Видео"
-            playbackError = null
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            catch (_: SecurityException) {}
+            val name = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':') ?: "Медиафайл"
+            playItem(uri, name, controller) { selectedUri = it; selectedName = name; playbackError = null }
+            MediaLibrary.addHistory(context, uri.toString())
         }
     }
-    val openAudio = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val openFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) {}
-            selectedUri = uri
-            selectedName = uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':') ?: "Аудио"
-            playbackError = null
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try { context.contentResolver.takePersistableUriPermission(uri, flags) }
+            catch (_: SecurityException) {
+                try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                catch (_: SecurityException) {}
+            }
+            MediaLibrary.addFolder(context, uri)
+            folders = MediaLibrary.folders(context)
+            scanMessage = "Папка добавлена. Нажми «Сканировать»."
         }
     }
 
     LaunchedEffect(selectedUri, controller) {
-        val uri = selectedUri
-        val mediaController = controller
-        if (uri != null && mediaController != null) {
-            val metadata = MediaMetadata.Builder().setTitle(selectedName ?: "KWPlayer").setArtist("KWPlayer").build()
-            mediaController.setMediaItem(MediaItem.Builder().setUri(uri).setMediaMetadata(metadata).build())
-            mediaController.prepare()
-            mediaController.play()
-        }
+        val uri = selectedUri ?: return@LaunchedEffect
+        val player = controller ?: return@LaunchedEffect
+        val item = MediaItem.Builder().setUri(uri)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(selectedName ?: "KW Player").setArtist("KW Player").build())
+            .build()
+        player.setMediaItem(item)
+        player.prepare()
+        player.play()
     }
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlayerError(error: PlaybackException) {
-                playbackError = "Не удалось воспроизвести файл. Возможно, кодек не поддерживается устройством."
+                playbackError = "Не удалось воспроизвести файл. Проверь формат и доступ к нему."
             }
         }
         controller?.addListener(listener)
         onDispose { controller?.removeListener(listener) }
     }
 
-    if (showSettings) {
+    if (showSkins) {
         AlertDialog(
-            onDismissRequest = { showSettings = false },
+            onDismissRequest = { showSkins = false },
             title = { Text("Оформление") },
             text = {
                 Column {
-                    listOf("standard" to "Стандартное", "winamp" to "Winamp Modern", "amoled" to "AMOLED Black", "retro" to "Classic Retro", "neon" to "Neon").forEach { (key, label) ->
+                    listOf(
+                        "standard" to "Standard — VLC style",
+                        "winamp" to "Winamp Modern",
+                        "amoled" to "AMOLED Black",
+                        "retro" to "Classic Retro",
+                        "neon" to "Neon"
+                    ).forEach { (key, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = skin == key, onClick = {
+                            RadioButton(skin == key, onClick = {
                                 skin = key
-                                preferences.edit().putString("skin", key).apply()
+                                prefs.edit().putString("skin", key).apply()
                             })
                             Text(label)
                         }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showSettings = false }) { Text("Готово") } }
+            confirmButton = { TextButton(onClick = { showSkins = false }) { Text("Готово") } }
         )
     }
 
-    MaterialTheme(colorScheme = darkColorScheme(primary = colors.accent, background = colors.background, surface = colors.surface, onBackground = colors.text, onSurface = colors.text)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = colors.background) {
-            Column(
-                modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("KWPlayer", color = colors.text, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-                        Text("ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР", color = colors.muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+    MaterialTheme(colorScheme = darkColorScheme(
+        primary = colors.accent, background = colors.background, surface = colors.surface,
+        onBackground = colors.text, onSurface = colors.text
+    )) {
+        Surface(Modifier.fillMaxSize(), color = colors.background) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (skin == "retro") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
+                            color = colors.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР", color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
                     }
-                    TextButton(onClick = { showSettings = true }) { Text("Настройки", color = colors.accent) }
+                    TextButton(onClick = { showSkins = true }) { Text("Скин", color = colors.accent) }
                 }
 
-                Column(modifier = Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(20.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (controller != null && selectedUri != null) {
-                        AndroidView(
-                            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-                            factory = { viewContext -> PlayerView(viewContext).apply {
-                                player = controller
-                                useController = true
-                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                            } },
-                            update = { it.player = controller }
-                        )
-                        Text(selectedName ?: "Сейчас воспроизводится", color = colors.text, fontWeight = FontWeight.SemiBold)
-                    } else {
-                        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(colors.background, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("▶", color = colors.accent, fontSize = 42.sp)
-                                Text("Выберите медиафайл", color = colors.text, fontWeight = FontWeight.SemiBold)
-                                Text("Видео и музыка с вашего устройства", color = colors.muted, fontSize = 12.sp)
+                if (topTabs(skin)) {
+                    Row(Modifier.fillMaxWidth().background(colors.surface), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        tabs.forEach { name ->
+                            TextButton(
+                                onClick = { tab = name },
+                                modifier = Modifier.weight(1f).background(
+                                    if (tab == name) colors.raised else Color.Transparent,
+                                    skinShape(skin)
+                                )
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(tabIcons[name] ?: "", color = if (tab == name) colors.accent else colors.muted)
+                                    Text(name.uppercase(Locale.ROOT), color = if (tab == name) colors.text else colors.muted, fontSize = 9.sp)
+                                }
                             }
                         }
                     }
-                    if (playbackError != null) Text(playbackError.orEmpty(), color = Color(0xFFFF8B8B), fontSize = 12.sp)
-                    if (controller == null) Text("Подключаем аудиосессию…", color = colors.muted, fontSize = 12.sp)
                 }
 
-                Text("ОТКРЫТЬ ФАЙЛ", color = colors.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
-                Button(onClick = { openVideo.launch(arrayOf("video/*")) }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.background)) {
-                    Text("Открыть видео", fontWeight = FontWeight.Bold)
-                }
-                Button(onClick = { openAudio.launch(arrayOf("audio/*")) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.raised, contentColor = colors.text)) {
-                    Text("Открыть аудио", fontWeight = FontWeight.SemiBold)
-                }
-
-                if (selectedUri != null && controller != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(onClick = { if (isPlaying) controller.pause() else controller.play() }, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.raised)) {
-                            Text(if (isPlaying) "Пауза" else "Продолжить", color = colors.text)
+                Column(
+                    Modifier.weight(1f).fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = if (skin == "amoled") 0.dp else 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    when (tab) {
+                        "Видео" -> {
+                            PageTitle("Видео", "Видеофайлы из выбранных папок", colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
+                            MediaList(
+                                items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites),
+                                favorites = favorites, colors = colors, skin = skin,
+                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
+                            )
+                            TextButton(onClick = { openFile.launch(arrayOf("video/*")) }) { Text("Открыть видеофайл", color = colors.accent) }
                         }
-                        Button(onClick = {
-                            controller.stop()
-                            controller.clearMediaItems()
-                            selectedUri = null
-                            selectedName = null
-                            playbackError = null
-                        }, modifier = Modifier.weight(1f).height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.raised)) {
-                            Text("Закрыть", color = colors.text)
+                        "Аудио" -> {
+                            PageTitle("Аудио", "Музыкальная библиотека", colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
+                            MediaList(
+                                items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites),
+                                favorites = favorites, colors = colors, skin = skin,
+                                onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
+                            )
+                            TextButton(onClick = { openFile.launch(arrayOf("audio/*")) }) { Text("Открыть аудиофайл", color = colors.accent) }
                         }
-                    }
-                }
-
-                Column(modifier = Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp)).padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("ОБНОВЛЕНИЯ", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                    Text("Установлена версия ${BuildConfig.VERSION_NAME}", color = colors.text, fontSize = 13.sp)
-                    Text(updateMessage, color = colors.muted, fontSize = 12.sp)
-                    availableRelease?.let { release ->
-                        Text("Доступна версия ${release.versionName} • ${String.format("%.1f", release.apkSize / 1_048_576f)} МБ", color = colors.accent, fontSize = 12.sp)
-                        Text(release.notes.take(400), color = colors.muted, fontSize = 11.sp)
-                    }
-                    Button(onClick = {
-                        updateBusy = true
-                        updateMessage = "Проверяем GitHub Releases…"
-                        AppUpdater.check { release, error ->
-                            updateBusy = false
-                            availableRelease = release
-                            downloadedApk = null
-                            updateMessage = when {
-                                error != null -> "Ошибка проверки: $error"
-                                release != null -> "Доступно обновление. Можно скачать APK."
-                                else -> "Установлена последняя версия."
+                        "Обзор" -> {
+                            PageTitle("Обзор", "Папки, история и избранное", colors)
+                            Panel(skin, colors) {
+                                Text("ПАПКИ", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Доступ только к папкам, которые ты выбрал. Сканирование запускается вручную.", color = colors.muted, fontSize = 12.sp)
+                                ActionButton(colors, "Добавить папку") { openFolder.launch(null) }
+                                ActionButton(colors, if (scanBusy) "Сканирование…" else "Сканировать медиатеку", enabled = !scanBusy) {
+                                    scanBusy = true
+                                    scanMessage = "Идёт поиск аудио и видео…"
+                                    Thread {
+                                        val result = MediaLibrary.scan(context)
+                                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                            media = result
+                                            scanBusy = false
+                                            scanMessage = "Найдено файлов: ${result.size}"
+                                        }
+                                    }.start()
+                                }
+                                Text(scanMessage, color = colors.muted, fontSize = 11.sp)
+                                folders.forEach { folder ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(folder.substringAfterLast('/').take(38), color = colors.text, modifier = Modifier.weight(1f), fontSize = 11.sp)
+                                        TextButton(onClick = {
+                                            MediaLibrary.removeFolder(context, folder)
+                                            folders = MediaLibrary.folders(context)
+                                        }) { Text("Убрать", color = colors.muted) }
+                                    }
+                                }
+                            }
+                            Panel(skin, colors) {
+                                Text("ИЗБРАННОЕ", color = colors.accent, fontWeight = FontWeight.Bold)
+                                MediaList(
+                                    media.filter { favorites.contains(it.uri.toString()) }, favorites, colors, skin,
+                                    onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) },
+                                    onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
+                                )
+                            }
+                            Panel(skin, colors) {
+                                Text("НЕДАВНО ОТКРЫТЫЕ", color = colors.accent, fontWeight = FontWeight.Bold)
+                                history.take(12).forEach { uri ->
+                                    val item = media.firstOrNull { it.uri.toString() == uri }
+                                    if (item != null) {
+                                        TextButton(onClick = { startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) }) {
+                                            Text(item.name, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                }
+                                if (history.isEmpty()) Text("История пока пуста.", color = colors.muted, fontSize = 12.sp)
                             }
                         }
-                    }, enabled = !updateBusy, modifier = Modifier.fillMaxWidth().height(46.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.raised)) {
-                        Text("Проверить обновления", color = colors.text)
-                    }
-                    if (availableRelease != null && downloadedApk == null) {
-                        Button(onClick = {
-                            val release = availableRelease ?: return@Button
-                            updateBusy = true
-                            updateMessage = "Скачиваем APK…"
-                            AppUpdater.download(context, release) { file, error ->
-                                updateBusy = false
-                                downloadedApk = file
-                                updateMessage = if (error == null) "APK загружен. Можно установить." else "Ошибка: $error"
+                        "Плейлист" -> {
+                            PageTitle("Плейлист", "Текущая очередь Media3", colors)
+                            Panel(skin, colors) {
+                                if (controller != null && controller.mediaItemCount > 0) {
+                                    repeat(controller.mediaItemCount) { index ->
+                                        val title = controller.getMediaItemAt(index).mediaMetadata.title?.toString() ?: "Медиафайл ${index + 1}"
+                                        TextButton(onClick = { controller.seekToDefaultPosition(index); controller.play() }) {
+                                            Text("${index + 1}. $title", color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                } else {
+                                    Text("Очередь пуста. Запусти файл из медиатеки.", color = colors.muted)
+                                }
                             }
-                        }, enabled = !updateBusy, modifier = Modifier.fillMaxWidth().height(46.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.accent)) {
-                            Text("Скачать обновление", color = colors.background)
+                        }
+                        else -> {
+                            PageTitle("Ещё", "Настройки и управление плеером", colors)
+                            Panel(skin, colors) {
+                                Text("ТЕКУЩЕЕ ВОСПРОИЗВЕДЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(selectedName ?: "Ничего не воспроизводится", color = colors.text, fontWeight = FontWeight.SemiBold)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TextButton(onClick = { if (isPlaying) controller?.pause() else controller?.play() }) {
+                                        Text(if (isPlaying) "Пауза" else "Продолжить", color = colors.accent)
+                                    }
+                                    TextButton(onClick = {
+                                        controller?.stop(); controller?.clearMediaItems()
+                                        selectedUri = null; selectedName = null
+                                    }) { Text("Остановить", color = colors.muted) }
+                                }
+                                Text("Скорость: ${"%.2f".format(Locale.US, playbackSpeed)}×", color = colors.text)
+                                Slider(value = playbackSpeed, onValueChange = { playbackSpeed = it }, valueRange = 0.5f..2f, steps = 5,
+                                    onValueChangeFinished = { controller?.setPlaybackSpeed(playbackSpeed) })
+                                if (controller != null) {
+                                    Text("Доступно изменение скорости воспроизведения.", color = colors.muted, fontSize = 11.sp)
+                                }
+                            }
+                            Panel(skin, colors) {
+                                Text("ОФОРМЛЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Скины меняют навигацию, форму и плотность панелей, а не только цвета.", color = colors.muted, fontSize = 12.sp)
+                                ActionButton(colors, "Выбрать оформление") { showSkins = true }
+                            }
+                            Panel(skin, colors) {
+                                Text("ОБНОВЛЕНИЯ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Установлена версия ${BuildConfig.VERSION_NAME}", color = colors.text)
+                                Text(updateMessage, color = colors.muted, fontSize = 12.sp)
+                                availableRelease?.let { release ->
+                                    Text("Доступна версия ${release.versionName} • ${String.format(Locale.US, "%.1f", release.apkSize / 1_048_576f)} МБ", color = colors.accent)
+                                    Text(release.notes.take(350), color = colors.muted, fontSize = 11.sp)
+                                }
+                                ActionButton(colors, if (updateBusy) "Проверяем…" else "Проверить обновления", enabled = !updateBusy) {
+                                    updateBusy = true
+                                    AppUpdater.check { release, error ->
+                                        updateBusy = false
+                                        availableRelease = release
+                                        downloadedApk = null
+                                        updateMessage = when {
+                                            error != null -> "Ошибка: $error"
+                                            release != null -> "Доступно обновление."
+                                            else -> "Установлена последняя версия."
+                                        }
+                                    }
+                                }
+                                if (availableRelease != null && downloadedApk == null) {
+                                    ActionButton(colors, "Скачать APK", enabled = !updateBusy) {
+                                        updateBusy = true
+                                        AppUpdater.download(context, availableRelease!!) { file, error ->
+                                            updateBusy = false; downloadedApk = file
+                                            updateMessage = error ?: "APK загружен."
+                                        }
+                                    }
+                                }
+                                downloadedApk?.let { apk ->
+                                    ActionButton(colors, "Установить обновление") {
+                                        val activity = context as? Activity ?: return@ActionButton
+                                        val launched = AppUpdater.install(activity, apk)
+                                        updateMessage = if (launched) "Подтверди установку в Android." else "Разреши установку APK."
+                                    }
+                                }
+                            }
+                            Panel(skin, colors) {
+                                Text("KW Player — Kibato Watch Player", color = colors.text, fontWeight = FontWeight.SemiBold)
+                                Text("Локальный плеер без рекламы, аккаунтов и отправки медиаданных.", color = colors.muted, fontSize = 11.sp)
+                            }
                         }
                     }
-                    downloadedApk?.let { apk ->
-                        Button(onClick = {
-                            val activity = context as? Activity ?: return@Button
-                            val launched = AppUpdater.install(activity, apk)
-                            updateMessage = if (launched) "Подтвердите установку в Android." else "Разрешите установку APK и повторите."
-                        }, modifier = Modifier.fillMaxWidth().height(46.dp), colors = ButtonDefaults.buttonColors(containerColor = colors.accent)) {
-                            Text("Установить обновление", color = colors.background)
-                        }
+                    if (selectedUri != null && tab != "Видео" && tab != "Аудио") {
+                        MiniPlayback(colors, selectedName, isPlaying, onToggle = {
+                            if (isPlaying) controller?.pause() else controller?.play()
+                        }, onStop = {
+                            controller?.stop(); controller?.clearMediaItems()
+                            selectedUri = null; selectedName = null
+                        })
                     }
+                    playbackError?.let { Text(it, color = Color(0xFFFF8B8B), fontSize = 12.sp) }
+                    Spacer(Modifier.height(8.dp))
                 }
-                Text("Kibato Watch Player • ${BuildConfig.VERSION_NAME}", color = colors.muted, fontSize = 10.sp)
+
+                if (!topTabs(skin)) {
+                    NavigationBar(containerColor = colors.surface) {
+                        tabs.forEach { name ->
+                            NavigationBarItem(
+                                selected = tab == name,
+                                onClick = { tab = name; query = ""; favoritesOnly = false },
+                                icon = { Text(tabIcons[name] ?: "", color = if (tab == name) colors.accent else colors.muted) },
+                                label = { Text(name, fontSize = 9.sp) }
+                            )
+                        }
+                    }
+                } else {
+                    Text("KIBATO WATCH PLAYER • ${BuildConfig.VERSION_NAME}", color = colors.muted, fontSize = 9.sp,
+                        modifier = Modifier.fillMaxWidth().background(colors.surface).padding(8.dp))
+                }
             }
         }
+    }
+}
+
+private fun playItem(uri: Uri, name: String, controller: MediaController?, onSelected: (Uri) -> Unit) {
+    onSelected(uri)
+    controller?.let {
+        it.setMediaItem(MediaItem.Builder().setUri(uri)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(name).setArtist("KW Player").build()).build())
+        it.prepare()
+        it.play()
+    }
+}
+
+private fun startLibraryItem(
+    item: LocalMediaItem,
+    controller: MediaController?,
+    onSelected: (LocalMediaItem) -> Unit,
+    context: android.content.Context
+) {
+    onSelected(item)
+    MediaLibrary.addHistory(context, item.uri.toString())
+    controller?.let {
+        it.setMediaItem(MediaItem.Builder().setUri(item.uri)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(item.name).setArtist("KW Player").build()).build())
+        it.prepare()
+        it.play()
+    }
+}
+
+private fun filterMedia(
+    source: List<LocalMediaItem>, query: String, newest: Boolean,
+    favoritesOnly: Boolean, favorites: Set<String>
+): List<LocalMediaItem> {
+    val filtered = source.filter {
+        it.name.contains(query, ignoreCase = true) &&
+            (!favoritesOnly || favorites.contains(it.uri.toString()))
+    }
+    return if (newest) filtered.sortedByDescending { it.modified } else filtered.sortedBy { it.name.lowercase(Locale.ROOT) }
+}
+
+@androidx.compose.runtime.Composable
+private fun PageTitle(title: String, subtitle: String, colors: PlayerColors) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, color = colors.text, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Text(subtitle, color = colors.muted, fontSize = 12.sp)
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun Panel(
+    skin: String, colors: PlayerColors,
+    content: @androidx.compose.runtime.Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    Column(
+        Modifier.fillMaxWidth().background(colors.surface, skinShape(skin))
+            .padding(if (skin == "retro") 10.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp), content = content
+    )
+}
+
+@androidx.compose.runtime.Composable
+private fun ActionButton(colors: PlayerColors, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(
+        onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().height(46.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.background)
+    ) { Text(label, fontWeight = FontWeight.SemiBold) }
+}
+
+@androidx.compose.runtime.Composable
+private fun LibraryControls(
+    query: String, onQuery: (String) -> Unit, newest: Boolean, onSort: (Boolean) -> Unit,
+    favoritesOnly: Boolean, onFavorites: (Boolean) -> Unit, colors: PlayerColors
+) {
+    OutlinedTextField(
+        value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(),
+        label = { Text("Поиск по названию") }, singleLine = true
+    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = { onSort(!newest) }) {
+            Text(if (newest) "Сначала новые" else "По имени А–Я", color = colors.accent)
+        }
+        TextButton(onClick = { onFavorites(!favoritesOnly) }) {
+            Text(if (favoritesOnly) "Все файлы" else "Только избранное", color = colors.accent)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun MediaList(
+    items: List<LocalMediaItem>, favorites: Set<String>, colors: PlayerColors, skin: String,
+    onPlay: (LocalMediaItem) -> Unit, onFavorite: (LocalMediaItem) -> Unit
+) {
+    if (items.isEmpty()) {
+        Text("Файлы не найдены. Добавь папку в разделе «Обзор» и запусти сканирование.", color = colors.muted, fontSize = 12.sp)
+    } else {
+        items.take(500).forEach { item ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onPlay(item) }
+                    .background(colors.surface, skinShape(skin)).padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(38.dp).background(colors.raised, skinShape(skin)), contentAlignment = Alignment.Center) {
+                    Text(if (item.isVideo) "▶" else "♫", color = colors.accent, fontSize = 17.sp)
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(item.name, color = colors.text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (item.size > 0) formatBytes(item.size) else item.mimeType, color = colors.muted, fontSize = 10.sp)
+                }
+                TextButton(onClick = { onFavorite(item) }) {
+                    Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 19.sp)
+                }
+            }
+        }
+        if (items.size > 500) Text("Показаны первые 500 файлов. Уточни поиск.", color = colors.muted, fontSize = 11.sp)
+    }
+}
+
+private fun formatBytes(size: Long): String = when {
+    size >= 1_073_741_824L -> String.format(Locale.US, "%.1f ГБ", size / 1_073_741_824.0)
+    size >= 1_048_576L -> String.format(Locale.US, "%.1f МБ", size / 1_048_576.0)
+    size >= 1024L -> String.format(Locale.US, "%.0f КБ", size / 1024.0)
+    else -> "$size Б"
+}
+
+@androidx.compose.runtime.Composable
+private fun MiniPlayback(
+    colors: PlayerColors, title: String?, playing: Boolean,
+    onToggle: () -> Unit, onStop: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(12.dp)).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("♫", color = colors.accent, fontSize = 22.sp)
+        Text(title ?: "Воспроизведение", color = colors.text, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
+        TextButton(onClick = onToggle) { Text(if (playing) "Ⅱ" else "▶", color = colors.accent) }
+        TextButton(onClick = onStop) { Text("×", color = colors.muted) }
     }
 }
