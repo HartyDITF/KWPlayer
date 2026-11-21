@@ -31,7 +31,7 @@ The service owns the player lifecycle. The UI never creates a second player. The
 
 ## Settings and skins
 
-Preferences DataStore migrates the existing skin preference and stores the selected skin and accent color. Built-in skins are safe presentation presets, including KW Modern and a Winamp Modern-inspired layout. Imported skin files must never execute code.
+Preferences DataStore migrates the existing skin preference and stores the selected skin, accent color and background-video playback preference (off by default). Built-in skins are safe presentation presets, including KW Modern and a Winamp Modern-inspired layout. Imported skin files must never execute code.
 - Video thumbnails and embedded audio artwork are decoded on demand, downscaled, and held in a bounded in-memory LRU cache.
 
 ## Widgets
