@@ -28,7 +28,7 @@ class KwSettingsRepository(context: Context) {
 
     val settings: Flow<KwSettings> = store.data.map {
         KwSettings(
-            skin = it[SKIN] ?: "standard",
+            skin = when (it[SKIN]) {\n                "light" -> "standard"\n                "retro" -> "winamp"\n                "neon" -> "amoled"\n                "standard", "winamp", "spotify", "oneui", "amoled" -> it[SKIN]!!\n                else -> "standard"\n            },
             accentArgb = it[ACCENT] ?: 0xFFFF8F1F.toInt(),
             backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false
         )
