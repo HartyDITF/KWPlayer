@@ -22,6 +22,7 @@ A successful CI build proves compilation only. Device behavior must be tested se
 - [ ] Verify audio focus and headset disconnect behavior on devices.
 
 ## Library and player quality
+- [x] Video library presentation modes: thumbnail-first home feed, compact list and two-column grid.
 - [ ] MediaStore discovery and broader metadata/artwork coverage.
 - [ ] Full queue editor, saved playlists and shuffle/repeat persistence.
 - [ ] Subtitle styling and audio/subtitle delay controls.
