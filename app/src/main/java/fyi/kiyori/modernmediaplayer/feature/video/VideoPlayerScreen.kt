@@ -58,6 +58,7 @@ fun VideoPlayerScreen(
     var speed by remember { mutableFloatStateOf(1f) }
     var fullscreen by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var controlsLocked by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
     var aspectMenu by remember { mutableStateOf(false) }
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
@@ -100,10 +101,17 @@ fun VideoPlayerScreen(
     }
 
     BackHandler {
-        if (fullscreen) {
-            fullscreen = false
-            controlsVisible = true
-        } else onClose()
+        when {
+            controlsLocked -> {
+                controlsLocked = false
+                controlsVisible = true
+            }
+            fullscreen -> {
+                fullscreen = false
+                controlsVisible = true
+            }
+            else -> onClose()
+        }
     }
 
     val originalScreenBrightness = remember(activity) {
@@ -204,28 +212,32 @@ fun VideoPlayerScreen(
         )
 
         Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().pointerInput(controller) {
+            Box(Modifier.fillMaxSize().pointerInput(controller, controlsLocked) {
                 detectTapGestures(
-                    onTap = { controlsVisible = !controlsVisible },
+                    onTap = { if (!controlsLocked) controlsVisible = !controlsVisible },
                     onDoubleTap = { offset ->
-                        when {
-                            offset.x < size.width / 3f -> controller?.seekBack()
-                            offset.x > size.width * 2f / 3f -> controller?.seekForward()
-                            else -> if (controller?.isPlaying == true) controller.pause() else controller?.play()
+                        if (!controlsLocked) {
+                            when {
+                                offset.x < size.width / 3f -> controller?.seekBack()
+                                offset.x > size.width * 2f / 3f -> controller?.seekForward()
+                                else -> if (controller?.isPlaying == true) controller.pause() else controller?.play()
+                            }
+                            controlsVisible = true
                         }
-                        controlsVisible = true
                     }
                 )
             })
-            Box(Modifier.fillMaxSize().pointerInput(activity, audioManager) {
+            Box(Modifier.fillMaxSize().pointerInput(activity, audioManager, controlsLocked) {
                 detectVerticalDragGestures(
                     onDragStart = { offset ->
+                        if (controlsLocked) return@detectVerticalDragGestures
                         dragStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                         dragStartBrightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
                         gestureHint = if (offset.x < size.width / 2f) "Яркость" else "Громкость"
                         controlsVisible = true
                     },
                     onVerticalDrag = { change, dragAmount ->
+                        if (controlsLocked) return@detectVerticalDragGestures
                         val fraction = (-dragAmount / size.height.toFloat()).coerceIn(-0.08f, 0.08f)
                         if (change.position.x < size.width / 2f) {
                             val attributes = activity?.window?.attributes ?: return@detectVerticalDragGestures
@@ -255,7 +267,16 @@ fun VideoPlayerScreen(
             }
         }
 
-        if (controlsVisible) {
+        if (controlsLocked) {
+            TextButton(
+                onClick = { controlsLocked = false; controlsVisible = true },
+                modifier = Modifier.align(Alignment.Center)
+                    .background(Color(0xCC171A20), androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) { Text("🔓 Разблокировать", color = Color.White) }
+        }
+
+        if (controlsVisible && !controlsLocked) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.fillMaxWidth().background(Color(0xB8000000))) {
                     Row(
@@ -266,6 +287,9 @@ fun VideoPlayerScreen(
                         Column(Modifier.weight(1f)) {
                             Text(title, color = Color.White, maxLines = 1)
                             Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                        }
+                        TextButton(onClick = { controlsLocked = true; controlsVisible = false }) {
+                            Text("🔒", color = Color.White, fontSize = 16.sp)
                         }
                         TextButton(onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
