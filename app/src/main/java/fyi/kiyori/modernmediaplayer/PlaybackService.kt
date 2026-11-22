@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
@@ -32,10 +33,20 @@ class PlaybackService : MediaSessionService() {
                 if (!isPlaying) persistPosition(player)
             }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                // Listener callbacks run on the player's application looper (main).
+                // Capture player state here; only database work runs on Dispatchers.IO.
                 val uri = mediaItem?.localConfiguration?.uri?.toString() ?: return
                 serviceScope.launch {
-                    val saved = runCatching { KwDatabase.get(this@PlaybackService).mediaDao().getPosition(uri) }.getOrNull()
-                    if (saved != null && saved > 0L && player.currentMediaItem?.localConfiguration?.uri?.toString() == uri) player.seekTo(saved)
+                    val saved = runCatching {
+                        KwDatabase.get(this@PlaybackService).mediaDao().getPosition(uri)
+                    }.getOrNull()
+                    if (saved != null && saved > 0L) {
+                        withContext(Dispatchers.Main.immediate) {
+                            if (player.currentMediaItem?.localConfiguration?.uri?.toString() == uri) {
+                                player.seekTo(saved)
+                            }
+                        }
+                    }
                 }
             }
         })
@@ -43,9 +54,14 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun persistPosition(player: ExoPlayer) {
+        // Read ExoPlayer state on its application looper before switching to IO.
         val uri = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
         val position = player.currentPosition.coerceAtLeast(0L)
-        serviceScope.launch { runCatching { KwDatabase.get(this@PlaybackService).mediaDao().updatePosition(uri, position) } }
+        serviceScope.launch {
+            runCatching {
+                KwDatabase.get(this@PlaybackService).mediaDao().updatePosition(uri, position)
+            }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
