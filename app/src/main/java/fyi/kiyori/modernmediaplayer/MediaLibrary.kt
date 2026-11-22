@@ -42,6 +42,18 @@ object MediaLibrary {
     }
 
     fun removeFolder(context: Context, uri: String) {
+        val treeUri = Uri.parse(uri)
+        context.contentResolver.persistedUriPermissions
+            .firstOrNull { it.uri == treeUri }
+            ?.let { permission ->
+                var flags = 0
+                if (permission.isReadPermission) flags = flags or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                if (permission.isWritePermission) flags = flags or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                if (flags != 0) {
+                    runCatching { context.contentResolver.releasePersistableUriPermission(treeUri, flags) }
+                }
+            }
+
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val values = prefs.getStringSet(FOLDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
         values.remove(uri)
