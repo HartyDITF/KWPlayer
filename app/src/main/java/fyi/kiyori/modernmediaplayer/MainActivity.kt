@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -169,6 +172,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var query by remember { mutableStateOf("") }
     var sortNewest by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
+    var videoGrid by remember { mutableStateOf(false) }
     var scanBusy by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Добавь папку и запусти сканирование.") }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
@@ -334,10 +338,11 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     when (tab) {
                         "Видео" -> {
                             PageTitle("Видео", "Видеофайлы из выбранных папок", colors)
+                            TextButton(onClick = { videoGrid = !videoGrid }) { Text(if (videoGrid) "☷ Список" else "▦ Сетка", color = colors.accent) }
                             LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
                             MediaList(
                                 items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites),
-                                favorites = favorites, colors = colors, skin = skin,
+                                favorites = favorites, colors = colors, skin = skin, grid = videoGrid,
                                 onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
                             )
@@ -654,68 +659,43 @@ private fun LibraryControls(
 @androidx.compose.runtime.Composable
 private fun MediaList(
     items: List<LocalMediaItem>, favorites: Set<String>, colors: PlayerColors, skin: String,
-    onPlay: (LocalMediaItem) -> Unit, onFavorite: (LocalMediaItem) -> Unit
+    onPlay: (LocalMediaItem) -> Unit, onFavorite: (LocalMediaItem) -> Unit, grid: Boolean = false
 ) {
     if (items.isEmpty()) {
         Text("Файлы не найдены. Добавь папку в разделе «Обзор» и запусти сканирование.", color = colors.muted, fontSize = 12.sp)
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items.take(500), key = { it.uri.toString() }) { item ->
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(colors.surface, skinShape(skin))
-                        .clickable { onPlay(item) }
-                        .padding(horizontal = 10.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MediaArtwork(
-                        item = item,
-                        modifier = Modifier.size(if (item.isVideo) 116.dp else 68.dp, 68.dp),
-                        accent = colors.accent,
-                        surface = colors.raised
-                    )
-                    Column(
-                        Modifier.weight(1f).padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            item.name,
-                            color = colors.text,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            listOfNotNull(
-                                if (item.size > 0) formatBytes(item.size) else null,
-                                item.mimeType.substringAfter('/').uppercase(Locale.ROOT)
-                            ).joinToString(" · "),
-                            color = colors.muted,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (item.isVideo) {
-                            Text("ВИДЕО", color = colors.accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                        }
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("▶", color = colors.accent, fontSize = 17.sp)
-                        TextButton(onClick = { onFavorite(item) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                            Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 19.sp)
-                        }
+    } else if (grid) {
+        LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxWidth().heightIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            gridItems(items.take(500), key = { it.uri.toString() }) { item ->
+                Column(Modifier.fillMaxWidth().background(colors.surface, skinShape(skin)).clickable { onPlay(item) }.padding(9.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    MediaArtwork(item = item, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f), accent = colors.accent, surface = colors.raised)
+                    Text(item.name, color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(listOfNotNull(if (item.size > 0) formatBytes(item.size) else null, item.mimeType.substringAfter("/").uppercase(Locale.ROOT)).joinToString(" · "), color = colors.muted, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        TextButton(onClick = { onFavorite(item) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 18.sp) }
                     }
                 }
             }
         }
-        if (items.size > 500) Text("Показаны первые 500 файлов. Уточни поиск.", color = colors.muted, fontSize = 11.sp)
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(items.take(500), key = { it.uri.toString() }) { item ->
+                Row(Modifier.fillMaxWidth().background(colors.surface, skinShape(skin)).clickable { onPlay(item) }.padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MediaArtwork(item = item, modifier = Modifier.size(if (item.isVideo) 116.dp else 68.dp, 68.dp), accent = colors.accent, surface = colors.raised)
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(item.name, color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(listOfNotNull(if (item.size > 0) formatBytes(item.size) else null, item.mimeType.substringAfter("/").uppercase(Locale.ROOT)).joinToString(" · "), color = colors.muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (item.isVideo) Text("ВИДЕО", color = colors.accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("▶", color = colors.accent, fontSize = 17.sp)
+                        TextButton(onClick = { onFavorite(item) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text(if (favorites.contains(item.uri.toString())) "★" else "☆", color = colors.accent, fontSize = 19.sp) }
+                    }
+                }
+            }
+        }
     }
+    if (items.size > 500) Text("Показаны первые 500 файлов. Уточни поиск.", color = colors.muted, fontSize = 11.sp)
 }
-
 private fun formatBytes(size: Long): String = when {
     size >= 1_073_741_824L -> String.format(Locale.US, "%.1f ГБ", size / 1_073_741_824.0)
     size >= 1_048_576L -> String.format(Locale.US, "%.1f МБ", size / 1_048_576.0)
