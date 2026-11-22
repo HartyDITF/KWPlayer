@@ -401,7 +401,15 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 history.take(12).forEach { uri ->
                                     val item = media.firstOrNull { it.uri.toString() == uri }
                                     if (item != null) {
-                                        TextButton(onClick = { startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; playbackError = null }, context) }) {
+                                        TextButton(onClick = {
+                                            startLibraryItem(item, controller, {
+                                                selectedUri = it.uri
+                                                selectedName = it.name
+                                                isVideoItem = it.isVideo
+                                                activePlayerScreen = if (it.isVideo) "video" else "audio"
+                                                playbackError = null
+                                            }, context)
+                                        }) {
                                             Text(item.name, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
