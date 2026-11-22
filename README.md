@@ -1,23 +1,29 @@
-# ModernMediaPlayer
+# KW Player (Kibato Watch Player)
 
-A private, offline-first Android media player inspired by Winamp Modern and VLC.
+A free, local-first Android audio and video player built with Kotlin, Jetpack Compose and AndroidX Media3. The interface includes several switchable visual styles, including a Winamp Modern-inspired skin.
 
-## Goals
+## Current foundation
 
-- Play local video and audio with broad, device-aware format compatibility.
-- Keep playback efficient on both entry-level and high-end Android phones.
-- Offer multiple themes and skins, including a Winamp Modern-inspired skin.
-- Let users pin selected folders to configurable Android home-screen widgets.
-- Work fully offline, without accounts, ads, analytics, subscriptions, or a required server.
+- Local audio and video playback through Media3 and a shared MediaSessionService.
+- User-selected SAF folders, manual library scanning, search, sorting, favorites and history.
+- Video controls for seeking, playback speed, aspect ratio, audio/subtitle tracks, external subtitle files, repeat, shuffle, touch lock, brightness and volume gestures, and Picture-in-Picture.
+- Optional background audio playback for video. It is off by default and can be changed in the video player or settings.
+- Audio now-playing screen with queue view, transport controls and device-supported equalizer controls.
+- Five built-in visual styles: KW Modern, Winamp Modern, Spotify Style, One UI and AMOLED Neon.
+- Android playback notification and a playback home-screen widget.
+- Local settings and media index, plus optional GitHub release checking and APK download.
+
+Some features remain incomplete, and device behavior has not yet been validated on all target phones. A successful GitHub Actions build confirms compilation, not real-device playback or codec compatibility.
 
 ## Development status
 
-**First app scaffold committed.** The app now has a native Android entry point, a dark starter screen, local video picking, and Media3 playback controls. GitHub Actions is configured to build a debug APK. The first successful CI build and real-device playback tests are still pending.
+Development is active on main. Every code change is checked through GitHub Actions before it is considered build-verified.
 
 See:
 - [Product specification](docs/PRODUCT_SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Build instructions](docs/BUILDING.md)
 
 ## Target devices
 
@@ -25,24 +31,20 @@ Initial real-device testing:
 - POCO X8 Pro Max
 - POCO M8 5G
 
-The app should also remain usable on lower-memory Android devices. Exact compatibility and performance targets will be established through physical-device testing.
+The app should remain usable on lower-memory Android devices. Exact codec compatibility, battery use and thermal behavior require physical-device testing.
 
 ## Technical direction
 
-- Kotlin
-- Android Jetpack / Compose for the application UI
-- AndroidX Media3 as the default playback engine
-- Android Storage Access Framework for user-selected folders
+- Kotlin and Jetpack Compose
+- AndroidX Media3 / ExoPlayer
+- Storage Access Framework (SAF)
 - Room for the local media index and playback positions
 - DataStore for preferences
-- Android App Widgets for folder shortcuts and playback controls
+- Android App Widgets / Jetpack Glance
+- GitHub Actions for APK builds
 
-A second playback engine such as LibVLC will only be considered after compatibility tests demonstrate a meaningful gap. This avoids shipping a large native engine unnecessarily and keeps licensing obligations explicit.
+A second playback engine such as LibVLC will only be considered after real-device tests demonstrate a meaningful compatibility gap. This avoids increasing APK size and memory use without evidence.
 
 ## Privacy
 
-All media indexing, playback history, and preferences are stored locally. The app will not upload media metadata or usage data.
-
-## Build
-
-Build instructions will be added with the first compilable Android project scaffold.
+Media indexing, playback history, favorites and preferences stay on the device. Scanning is user-triggered. The app does not include ads, analytics, accounts, telemetry or media uploads. Network access is used only for the optional GitHub update checker and APK download.
