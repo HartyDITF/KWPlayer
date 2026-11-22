@@ -192,7 +192,7 @@ fun NowPlayingScreen(
                         Row(
                             Modifier.fillMaxWidth()
                                 .background(if (index == currentIndex) accent.copy(alpha = 0.13f) else Color.Transparent, RoundedCornerShape(12.dp))
-                                .clickable { controller?.seekToMediaItem(index) }
+                                .clickable { controller?.seekTo(index, 0L) }
                                 .padding(horizontal = 10.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
