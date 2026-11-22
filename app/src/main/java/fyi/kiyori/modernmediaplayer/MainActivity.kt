@@ -172,7 +172,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var query by remember { mutableStateOf("") }
     var sortNewest by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
-    var videoGrid by remember { mutableStateOf(false) }
+    var videoLayout by remember { mutableStateOf(0) } // 0: feed, 1: list, 2: grid
     var scanBusy by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Добавь папку и запусти сканирование.") }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
@@ -338,11 +338,23 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     when (tab) {
                         "Видео" -> {
                             PageTitle("Видео", "Видеофайлы из выбранных папок", colors)
-                            TextButton(onClick = { videoGrid = !videoGrid }) { Text(if (videoGrid) "☷ Список" else "▦ Сетка", color = colors.accent) }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("Главная" to 0, "Список" to 1, "Сетка" to 2).forEach { (label, mode) ->
+                                    TextButton(
+                                        onClick = { videoLayout = mode },
+                                        modifier = Modifier.weight(1f).background(
+                                            if (videoLayout == mode) colors.raised else Color.Transparent,
+                                            skinShape(skin)
+                                        )
+                                    ) {
+                                        Text(label, color = if (videoLayout == mode) colors.accent else colors.muted, fontSize = 12.sp)
+                                    }
+                                }
+                            }
                             LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
                             MediaList(
                                 items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites),
-                                favorites = favorites, colors = colors, skin = skin, grid = videoGrid,
+                                favorites = favorites, colors = colors, skin = skin, grid = videoLayout == 2, feed = videoLayout == 0,
                                 onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
                             )
@@ -667,10 +679,82 @@ private fun LibraryControls(
 @androidx.compose.runtime.Composable
 private fun MediaList(
     items: List<LocalMediaItem>, favorites: Set<String>, colors: PlayerColors, skin: String,
-    onPlay: (LocalMediaItem) -> Unit, onFavorite: (LocalMediaItem) -> Unit, grid: Boolean = false
+    onPlay: (LocalMediaItem) -> Unit, onFavorite: (LocalMediaItem) -> Unit,
+    grid: Boolean = false, feed: Boolean = false
 ) {
     if (items.isEmpty()) {
         Text("Файлы не найдены. Добавь папку в разделе «Обзор» и запусти сканирование.", color = colors.muted, fontSize = 12.sp)
+    } else if (feed) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            items.take(500).forEach { item ->
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(colors.surface, skinShape(skin))
+                        .clickable { onPlay(item) }
+                ) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                        MediaArtwork(
+                            item = item,
+                            modifier = Modifier.fillMaxSize(),
+                            accent = colors.accent,
+                            surface = colors.raised
+                        )
+                        Text(
+                            "▶",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            modifier = Modifier.align(Alignment.Center)
+                                .background(Color(0x99000000), RoundedCornerShape(50))
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        Text(
+                            item.mimeType.substringAfter("/").uppercase(Locale.ROOT),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            modifier = Modifier.align(Alignment.BottomEnd)
+                                .padding(8.dp)
+                                .background(Color(0xCC000000), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 9.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(
+                                item.name,
+                                color = colors.text,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                listOfNotNull(
+                                    if (item.size > 0) formatBytes(item.size) else null,
+                                    "Локальное видео"
+                                ).joinToString(" · "),
+                                color = colors.muted,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        TextButton(
+                            onClick = { onFavorite(item) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)
+                        ) {
+                            Text(
+                                if (favorites.contains(item.uri.toString())) "★" else "☆",
+                                color = colors.accent,
+                                fontSize = 21.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
     } else if (grid) {
         LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxWidth().heightIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             gridItems(items.take(500), key = { it.uri.toString() }) { item ->
