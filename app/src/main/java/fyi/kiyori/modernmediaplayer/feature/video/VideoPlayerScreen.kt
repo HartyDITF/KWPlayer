@@ -17,11 +17,13 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -61,12 +63,20 @@ fun VideoPlayerScreen(
     var controlsLocked by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
     var aspectMenu by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var sideFieldMode by remember { mutableIntStateOf(0) }
+    var keepScreenOn by remember { mutableStateOf(true) }
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
     var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
     var subtitleNotice by remember { mutableStateOf<String?>(null) }
     var gestureHint by remember { mutableStateOf<String?>(null) }
     val audioManager = remember(context) { context.getSystemService(Activity.AUDIO_SERVICE) as AudioManager }
+    val sideFieldColor = when (sideFieldMode) {
+        1 -> Color(0xFF101419)
+        2 -> accent.copy(alpha = 0.24f)
+        else -> Color.Black
+    }
     var dragStartVolume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
 
@@ -121,15 +131,25 @@ fun VideoPlayerScreen(
 
     DisposableEffect(activity) {
         val oldOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val wasKeepScreenOn = activity?.window?.let { (it.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0 } ?: false
         onDispose {
             activity?.requestedOrientation = oldOrientation
             activity?.window?.let { window ->
+                if (wasKeepScreenOn) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 window.attributes = window.attributes.apply {
                     screenBrightness = originalScreenBrightness
                 }
                 WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
             }
         }
+    }
+
+    DisposableEffect(activity, isPlaying, keepScreenOn) {
+        val window = activity?.window
+        if (keepScreenOn && isPlaying) window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { }
     }
 
     LaunchedEffect(activity, fullscreen) {
@@ -201,6 +221,8 @@ fun VideoPlayerScreen(
                     useController = false
                     resizeMode = aspectMode
                     setKeepContentOnPlayerReset(true)
+                    setShutterBackgroundColor(sideFieldColor.toArgb())
+                    setBackgroundColor(sideFieldColor.toArgb())
                     player = controller
                 }
             },
@@ -208,6 +230,8 @@ fun VideoPlayerScreen(
             update = {
                 it.player = controller
                 it.resizeMode = aspectMode
+                it.setShutterBackgroundColor(sideFieldColor.toArgb())
+                it.setBackgroundColor(sideFieldColor.toArgb())
             }
         )
 
@@ -300,6 +324,9 @@ fun VideoPlayerScreen(
                                 }
                             }
                         }) { Text("PiP", color = accent, fontSize = 13.sp) }
+                        TextButton(onClick = { settingsOpen = true; controlsVisible = true }) {
+                            Text("⚙", color = Color.White, fontSize = 20.sp)
+                        }
                         TextButton(onClick = { fullscreen = !fullscreen; controlsVisible = true }) {
                             Text(if (fullscreen) "⤢" else "⛶", color = Color.White, fontSize = 20.sp)
                         }
@@ -458,6 +485,60 @@ fun VideoPlayerScreen(
                 ) { Text("+10") }
             }
         }
+    }
+
+    if (settingsOpen) {
+        AlertDialog(
+            onDismissRequest = { settingsOpen = false },
+            title = { Text("Настройки видео") },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("ФОРМАТ ИЗОБРАЖЕНИЯ", color = accent, style = MaterialTheme.typography.labelMedium)
+                    listOf(
+                        "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
+                        "Заполнить экран" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                        "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    ).forEach { (label, mode) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = aspectMode == mode, onClick = { aspectMode = mode })
+                            Text(label, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
+                    Divider()
+                    Text("ЦВЕТ БОКОВЫХ ПОЛЕЙ", color = accent, style = MaterialTheme.typography.labelMedium)
+                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Цвет акцента" to 2).forEach { (label, mode) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = sideFieldMode == mode, onClick = { sideFieldMode = mode })
+                            Text(label, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
+                    Divider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Не выключать экран")
+                            Text("Пока видео воспроизводится", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = keepScreenOn, onCheckedChange = { keepScreenOn = it })
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Фоновое воспроизведение")
+                            Text("Продолжать звук после сворачивания", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = backgroundPlaybackEnabled,
+                            onCheckedChange = onBackgroundPlaybackChange
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { settingsOpen = false }) { Text("Готово", color = accent) }
+            }
+        )
     }
 }
 
