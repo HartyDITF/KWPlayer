@@ -19,6 +19,7 @@ KW Player (Kibato Watch Player) is a free, local-first Android media player with
 - Open local audio/video files and select folders through SAF.
 - Explicit recursive scanning of user-selected folders, with Room media index and a legacy local index fallback.
 - Video/audio library views with search, sorting, favorites and recently opened history.
+- Video library offers YouTube-inspired local-media feed cards with large thumbnails, plus list and grid layouts.
 - Release SAF folder permissions when a folder is removed from the library.
 - Preferences DataStore stores the selected skin, accent and background-video playback preference.
 - Dedicated audio now-playing screen with seek, shuffle, previous/next, queue preview and device-supported equalizer bands.
