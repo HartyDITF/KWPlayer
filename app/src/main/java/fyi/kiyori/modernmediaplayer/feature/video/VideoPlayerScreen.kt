@@ -52,6 +52,7 @@ fun VideoPlayerScreen(
     val context = LocalContext.current
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+    var isPlaying by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
     var seekPreview by remember { mutableFloatStateOf(0f) }
     var seeking by remember { mutableStateOf(false) }
     var speed by remember { mutableFloatStateOf(1f) }
@@ -105,11 +106,19 @@ fun VideoPlayerScreen(
         } else onClose()
     }
 
+    val originalScreenBrightness = remember(activity) {
+        activity?.window?.attributes?.screenBrightness
+            ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+    }
+
     DisposableEffect(activity) {
         val oldOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         onDispose {
             activity?.requestedOrientation = oldOrientation
             activity?.window?.let { window ->
+                window.attributes = window.attributes.apply {
+                    screenBrightness = originalScreenBrightness
+                }
                 WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
             }
         }
@@ -128,13 +137,45 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(controller) {
-        while (true) {
-            position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
-            duration = controller?.duration?.takeIf { it > 0L } ?: 0L
-            repeatMode = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
-            shuffleEnabled = controller?.shuffleModeEnabled ?: false
-            delay(400)
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                duration = controller?.duration?.takeIf { it > 0L } ?: 0L
+                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            }
+
+            override fun onRepeatModeChanged(mode: Int) {
+                repeatMode = mode
+            }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                shuffleEnabled = shuffleModeEnabled
+            }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                duration = player.duration.takeIf { it > 0L } ?: 0L
+                position = player.currentPosition.coerceAtLeast(0L)
+            }
+        }
+        controller?.addListener(listener)
+        duration = controller?.duration?.takeIf { it > 0L } ?: 0L
+        position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        repeatMode = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
+        shuffleEnabled = controller?.shuffleModeEnabled ?: false
+        onDispose { controller?.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller, isPlaying, controlsVisible) {
+        val player = controller ?: return@LaunchedEffect
+        while (isPlaying && controlsVisible) {
+            position = player.currentPosition.coerceAtLeast(0L)
+            duration = player.duration.takeIf { it > 0L } ?: 0L
+            delay(500)
         }
     }
 
