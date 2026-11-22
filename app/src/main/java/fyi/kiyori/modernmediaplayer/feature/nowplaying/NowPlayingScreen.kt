@@ -41,12 +41,44 @@ fun NowPlayingScreen(
     var preview by remember { mutableFloatStateOf(0f) }
     var seeking by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
+    var isPlaying by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
 
-    LaunchedEffect(controller) {
-        while (true) {
-            position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
-            duration = controller?.duration?.takeIf { it > 0L } ?: 0L
-            delay(750)
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                duration = controller?.duration?.takeIf { it > 0L } ?: 0L
+                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            }
+
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                seeking = false
+                position = 0L
+                duration = controller?.duration?.takeIf { it > 0L } ?: 0L
+            }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                duration = player.duration.takeIf { it > 0L } ?: 0L
+                position = player.currentPosition.coerceAtLeast(0L)
+            }
+        }
+        controller?.addListener(listener)
+        isPlaying = controller?.isPlaying == true
+        duration = controller?.duration?.takeIf { it > 0L } ?: 0L
+        position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        onDispose { controller?.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller, isPlaying) {
+        val player = controller ?: return@LaunchedEffect
+        while (isPlaying) {
+            position = player.currentPosition.coerceAtLeast(0L)
+            duration = player.duration.takeIf { it > 0L } ?: 0L
+            delay(500)
         }
     }
 
@@ -192,7 +224,12 @@ fun NowPlayingScreen(
                         Row(
                             Modifier.fillMaxWidth()
                                 .background(if (index == currentIndex) accent.copy(alpha = 0.13f) else Color.Transparent, RoundedCornerShape(12.dp))
-                                .clickable { controller?.seekTo(index, 0L) }
+                                .clickable {
+                                    controller?.let { player ->
+                                        player.seekTo(index, 0L)
+                                        player.play()
+                                    }
+                                }
                                 .padding(horizontal = 10.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
