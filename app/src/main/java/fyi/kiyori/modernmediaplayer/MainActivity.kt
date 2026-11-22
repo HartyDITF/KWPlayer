@@ -102,22 +102,21 @@ private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Об
 
 private fun colorsForSkin(skin: String) = when (skin) {
     "winamp" -> PlayerColors(Color(0xFF090E18), Color(0xFF18283B), Color(0xFF243D58), Color(0xFF62C4FF), Color(0xFFF1F6FC), Color(0xFF9AAABD))
+    "spotify" -> PlayerColors(Color(0xFF101010), Color(0xFF181818), Color(0xFF282828), Color(0xFF1ED760), Color.White, Color(0xFFB3B3B3))
+    "oneui" -> PlayerColors(Color(0xFF111318), Color(0xFF1B1E25), Color(0xFF292D36), Color(0xFF8AB4F8), Color(0xFFF3F4F7), Color(0xFFAEB4C0))
     "amoled" -> PlayerColors(Color.Black, Color(0xFF080808), Color(0xFF171717), Color(0xFF5CF2CF), Color.White, Color(0xFFAAAAAA))
-    "light" -> PlayerColors(Color(0xFFF2F4F7), Color.White, Color(0xFFE5E8ED), Color(0xFFCF6812), Color(0xFF171A20), Color(0xFF5D6674))
-    "retro" -> PlayerColors(Color(0xFF17130D), Color(0xFF302719), Color(0xFF493A25), Color(0xFFE6B85C), Color(0xFFFFF3D8), Color(0xFFC4B28F))
-    "neon" -> PlayerColors(Color(0xFF10091B), Color(0xFF21132F), Color(0xFF352047), Color(0xFFFF62C7), Color(0xFFFFF2FC), Color(0xFFC0A8C2))
     else -> PlayerColors(Color(0xFF101419), Color(0xFF1B222B), Color(0xFF27323E), Color(0xFF78B9F2), Color(0xFFF3F6FA), Color(0xFFAAB5C2))
 }
 
 private fun skinShape(skin: String) = when (skin) {
     "amoled" -> RoundedCornerShape(0.dp)
-    "retro" -> RoundedCornerShape(3.dp)
-    "neon" -> RoundedCornerShape(22.dp)
     "winamp" -> RoundedCornerShape(8.dp)
+    "spotify" -> RoundedCornerShape(18.dp)
+    "oneui" -> RoundedCornerShape(24.dp)
     else -> RoundedCornerShape(14.dp)
 }
 
-private fun topTabs(skin: String) = skin == "winamp" || skin == "retro"
+private fun topTabs(skin: String) = skin == "winamp"
 
 class MainActivity : ComponentActivity() {
     private val controllerState = mutableStateOf<MediaController?>(null)

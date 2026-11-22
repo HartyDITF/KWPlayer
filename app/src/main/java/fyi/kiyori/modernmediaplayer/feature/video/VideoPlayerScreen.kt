@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.PictureInPictureParams
 import android.os.Build
 import android.util.Rational
+import android.media.AudioManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.media3.common.MediaItem
@@ -12,6 +13,7 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +37,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
 import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun VideoPlayerScreen(
@@ -60,6 +63,10 @@ fun VideoPlayerScreen(
     var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
     var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
     var subtitleNotice by remember { mutableStateOf<String?>(null) }
+    var gestureHint by remember { mutableStateOf<String?>(null) }
+    val audioManager = remember(context) { context.getSystemService(Activity.AUDIO_SERVICE) as AudioManager }
+    var dragStartVolume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
+    var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
 
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -155,19 +162,57 @@ fun VideoPlayerScreen(
             }
         )
 
-        Box(Modifier.fillMaxSize().pointerInput(controller) {
-            detectTapGestures(
-                onTap = { controlsVisible = !controlsVisible },
-                onDoubleTap = { offset ->
-                    when {
-                        offset.x < size.width / 3f -> controller?.seekBack()
-                        offset.x > size.width * 2f / 3f -> controller?.seekForward()
-                        else -> if (controller?.isPlaying == true) controller.pause() else controller?.play()
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().pointerInput(controller) {
+                detectTapGestures(
+                    onTap = { controlsVisible = !controlsVisible },
+                    onDoubleTap = { offset ->
+                        when {
+                            offset.x < size.width / 3f -> controller?.seekBack()
+                            offset.x > size.width * 2f / 3f -> controller?.seekForward()
+                            else -> if (controller?.isPlaying == true) controller.pause() else controller?.play()
+                        }
+                        controlsVisible = true
                     }
-                    controlsVisible = true
-                }
-            )
-        })
+                )
+            })
+            Box(Modifier.fillMaxSize().pointerInput(activity, audioManager) {
+                detectVerticalDragGestures(
+                    onDragStart = { offset ->
+                        dragStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        dragStartBrightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
+                        gestureHint = if (offset.x < size.width / 2f) "Яркость" else "Громкость"
+                        controlsVisible = true
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        val fraction = (-dragAmount / size.height.toFloat()).coerceIn(-0.08f, 0.08f)
+                        if (change.position.x < size.width / 2f) {
+                            val attributes = activity?.window?.attributes ?: return@detectVerticalDragGestures
+                            val current = attributes.screenBrightness.takeIf { it >= 0f } ?: dragStartBrightness
+                            val next = (current + fraction).coerceIn(0.02f, 1f)
+                            attributes.screenBrightness = next
+                            activity.window.attributes = attributes
+                            gestureHint = "Яркость ${(next * 100).roundToInt()}%"
+                        } else {
+                            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                            val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            val delta = (fraction * max * 2f).roundToInt()
+                            val next = (current + delta).coerceIn(0, max)
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, next, 0)
+                            gestureHint = "Громкость ${(next * 100f / max).roundToInt()}%"
+                        }
+                    },
+                    onDragEnd = { gestureHint = null },
+                    onDragCancel = { gestureHint = null }
+                )
+            })
+        }
+
+        gestureHint?.let { hint ->
+            Surface(modifier = Modifier.align(Alignment.Center), color = Color(0xCC171A20), shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
+                Text(hint, color = Color.White, modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp))
+            }
+        }
 
         if (controlsVisible) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
