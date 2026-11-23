@@ -41,6 +41,18 @@ object MediaLibrary {
         prefs.edit().putStringSet(FOLDERS, values).apply()
     }
 
+    fun folderLabel(uri: String): String = runCatching {
+        DocumentsContract.getTreeDocumentId(Uri.parse(uri))
+            .substringAfterLast(':')
+            .substringAfterLast('/')
+            .ifBlank { "Папка" }
+    }.getOrDefault("Папка")
+
+    fun isInFolder(itemUri: Uri, folderUri: String): Boolean = runCatching {
+        DocumentsContract.getTreeDocumentId(itemUri) ==
+            DocumentsContract.getTreeDocumentId(Uri.parse(folderUri))
+    }.getOrDefault(false)
+
     fun removeFolder(context: Context, uri: String) {
         val treeUri = Uri.parse(uri)
         context.contentResolver.persistedUriPermissions
