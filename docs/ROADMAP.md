@@ -1,43 +1,118 @@
-# Development roadmap
+# KW Player — дорожная карта реализации
 
-A successful CI build proves compilation only. Device behavior must be tested separately.
+Последнее обновление: 23 ноября 2026 г.
 
-## Foundation and playback
-- [x] Kotlin / Compose project and GitHub Actions debug APK build.
-- [x] Media3 ExoPlayer through MediaSessionService and MediaController.
-- [x] Audio focus and noisy-headset handling.
-- [x] Local file open and SAF folder selection.
-- [x] User-triggered recursive scan, search, sorting, favorites and history.
-- [x] Room media index and resume-position storage foundation.
-- [x] Preferences DataStore with migration from the previous skin preference.
-- [x] Audio now-playing screen with transport controls, seek, queue preview and device-supported equalizer.
-- [x] Video screen with Media3 PlayerView, seek, skip and speed controls.
-- [x] External subtitle file picker and audio/subtitle track selection.
-- [x] Video aspect-ratio modes, repeat, shuffle and touch lock.
-- [x] Brightness/volume gestures and Picture-in-Picture entry.
-- [x] Optional background audio playback for video, off by default and switchable in-player.
-- [x] Glance playback widget with transport controls.
-- [ ] Confirm notification and lock-screen controls on POCO X8 Pro Max and POCO M8 5G.
-- [ ] Verify resume positions after force-stop, process death and firmware background restrictions.
-- [ ] Verify audio focus and headset disconnect behavior on devices.
+> Статус отмечается по фактическому коду в репозитории. Успешная CI-сборка подтверждает компиляцию, но не заменяет проверку на физических устройствах. Пункт не считается завершённым, пока его критерии не выполнены.
 
-## Library and player quality
-- [x] Video library presentation modes: thumbnail-first home feed, compact list and two-column grid.
-- [ ] MediaStore discovery and broader metadata/artwork coverage.
-- [ ] Full queue editor, saved playlists and shuffle/repeat persistence.
-- [ ] Subtitle styling and audio/subtitle delay controls.
-- [ ] True audio spectrum with explicit permission flow.
-- [ ] Device/codec compatibility test matrix.
+## Текущий статус
 
-## Design and widgets
-- [x] Central dark design tokens and accent color.
-- [x] KW Modern, Winamp Modern, Spotify Style, One UI and AMOLED Neon skin presets.
-- [ ] Finish typography assets and per-skin layout refinement.
-- [ ] Safe skin import format.
-- [ ] Folder widgets and configurable independent folder widget setup.
-- [ ] Validate widget resize behavior and event-driven refresh.
+- **Этап 1 — тема и скины:** в работе; семь пресетов и единая модель токенов добавлены, исправления ошибок компиляции отправлены, требуется дождаться новой CI-сборки.
+- **Этапы 2–10:** ещё не начаты в рамках текущего плана.
+- **Устройства:** тестирование на POCO X8 Pro Max и POCO M8 5G не проводилось.
+- **Rust:** отложен до завершения Kotlin-реализации и измерений производительности.
 
-## Release quality
-- [x] GitHub release checker and signed APK installer handoff.
-- [ ] Build and publish a signed release APK for the next stable version.
-- [ ] Physical-device playback, battery, thermal and long-session testing.
+## Этапы реализации
+
+### 1. Тема и скины
+- [x] Добавлена модель KwSkin с основными токенами цветов, радиусов, шрифта, темы и положения навигации.
+- [x] Добавлены пресеты KW Modern, Winamp Modern, Spotify Style, One UI Style, AMOLED Neon, Material You (пока статическая базовая палитра), Classic VLC.
+- [x] Окно выбора скина показывает семь вариантов и их краткие описания.
+- [x] DataStore принимает идентификаторы Material You и Classic VLC.
+- [x] MainActivity получает базовые цвета и форму карточек из KwSkin.
+- [ ] CI-сборка после исправления Kotlin-синтаксиса должна завершиться успешно.
+- [ ] Выбор скина и его акцента должен сохраняться и применяться без перезапуска.
+- [ ] Реализовать все настройки акцента, масштаба радиусов, фона и светлой/тёмной темы в DataStore.
+- [ ] Подключить динамические цвета Android 12+ из системных обоев.
+- [ ] Завершить рельефные панели, Tahoma и LCD-оформление Winamp.
+- [ ] Убрать жёстко заданные цвета из экранов и проверить контрастность/размеры целей.
+- [ ] Проверить мгновенную смену оформления на всех экранах.
+
+**Ошибки CI, обнаруженные 23.11.2026:**
+- В MainActivity.kt в обработчик onSelect попали буквальные символы `\\n` вместо переводов строк.
+- В KwTheme.kt аналогично оказался буквальный `\\n` в строке импорта; из-за этого не распознавался импорт `luminance`.
+- Исправления внесены в коммитах `2491205` и `cb0b24f`. Результат следующей CI-сборки пока не подтверждён.
+
+### 2. Каркас и навигация
+- [ ] Шапка KW Player с поиском и вызовом шторки оформления.
+- [ ] Пять вкладок: Видео, Аудио, Обзор, Плейлист, Ещё.
+- [ ] Перенос навигации наверх для Winamp.
+- [ ] Мини-плеер над навигацией, открытие полного плеера.
+- [ ] Сохранение состояния прокрутки каждой вкладки.
+- [ ] Русские строки вынесены в strings.xml.
+
+### 3. Вкладка «Видео»
+- [ ] Фильтры Все / Недавние / Избранное / Папки / Не досмотрено.
+- [ ] Переключение Лента / Список с сохранением в DataStore.
+- [ ] Данные MediaStore, миниатюры и метаданные.
+- [ ] Возобновление воспроизведения с сохранённой позиции.
+- [ ] Пустые состояния и добавление папки.
+- [ ] Проверка производительности на большой медиатеке.
+
+### 4. Аудио и полный плеер
+- [ ] Разделы Все / Альбомы / Исполнители / Папки.
+- [ ] Недавно проигранное и пользовательские плейлисты.
+- [ ] Полный экран аудиоплеера и управление очередью.
+- [ ] Таймер сна, избранное, повтор и перемешивание.
+- [ ] Winamp LCD, спектр и 10-полосный эквалайзер с корректным разрешением.
+- [ ] Проверка доступности и корректности обложек.
+
+### 5. Обзор, плейлист, «Ещё» и оформление
+- [ ] Локальные папки через SAF с постоянным разрешением.
+- [ ] Разделы сетевых источников SMB / DLNA / FTP / SFTP — только с реальной поддержкой протоколов.
+- [ ] Редактируемая очередь, изменение порядка, удаление и отмена.
+- [ ] Вкладка «Ещё» с реально работающими настройками воспроизведения.
+- [ ] Полноценная ModalBottomSheet оформления с акцентами, углами, фоном и темой.
+
+### 6. Видеоплеер
+- [ ] Боковые поля: чёрные / адаптивные / пользовательский цвет.
+- [ ] Режимы FIT / ZOOM / 4:3.
+- [ ] Жесты перемотки, яркости и громкости.
+- [ ] Панель управления и вложенные настройки как в спецификации.
+- [ ] Субтитры, задержка, аудиодорожки, закладки, A–B и снимок кадра.
+- [ ] Проверка стабильности SurfaceView при смене ориентации и режимов.
+
+### 7. Сервис, фон, PiP и звук
+- [ ] Проверить MediaSession и системное уведомление.
+- [ ] Фоновое воспроизведение выключено по умолчанию и управляется настройкой.
+- [ ] PiP только при активном воспроизведении.
+- [ ] Корректный audio focus и пауза при отключении наушников.
+- [ ] Восстановление позиции/очереди после убийства процесса.
+- [ ] Проверка звонков, блокировки экрана и ограничений фоновой работы Android.
+
+### 8. Загрузка по ссылке
+- [ ] Экран URL и разбор поддерживаемых источников.
+- [ ] Реальные варианты качества/озвучки только если источник их предоставляет.
+- [ ] Media3 DownloadManager / DownloadService.
+- [ ] HTTP Range с проверкой ответа 206 и честной обработкой серверов без докачки.
+- [ ] Возобновление загрузки после потери сети и перезапуска.
+- [ ] Экран очереди загрузок, пауза, продолжение и ошибки.
+- [ ] Предупреждение об ответственности пользователя за контент.
+
+### 9. Виджеты Glance
+- [x] Существующий виджет управления воспроизведением.
+- [ ] Виджеты выбранных папок: Сетка / Список / Карточка.
+- [ ] Виджет «Учёба».
+- [ ] Конфигурация каждого appWidgetId и сохранение SAF-разрешений.
+- [ ] Обновление по событиям и ограничение частоты обновлений.
+- [ ] Проверка изменения размеров и запуска видео из виджета.
+
+### 10. Rust — только после измерений, необязательный этап
+- [ ] Сначала завершить и измерить Kotlin-реализацию.
+- [ ] Переносить только доказанно узкие места: индексирование и/или Range-загрузку.
+- [ ] Compose и Media3 остаются на Kotlin; Rust изолирован за интерфейсом.
+
+## Проверка качества и выпуск
+- [ ] CI успешно собирает debug APK.
+- [ ] Проверены установка, запуск и отсутствие падений.
+- [ ] Проверены поворот, PiP, фон, уведомления, потеря сети и отзыв разрешений.
+- [ ] Проверены форматы/кодеки на реальных устройствах.
+- [ ] Проверены нагрев, расход батареи и длительное воспроизведение.
+- [ ] Только после проверки создан релизный APK.
+
+## Правила ведения дорожной карты
+
+1. Обновлять этот файл после каждого завершённого этапа и существенного исправления.
+2. Ставить `[x]` только за реально реализованный код; отдельной строкой указывать, прошла ли CI и проверено ли на устройстве.
+3. Не выдавать макет интерфейса за работающую функцию.
+4. Не считать успешную компиляцию доказательством стабильности на телефоне.
+5. Сверяться с `KW_Player_promt.md` перед каждым этапом.
