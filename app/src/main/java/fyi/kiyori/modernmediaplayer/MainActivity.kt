@@ -321,16 +321,16 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (tab == "Настройки") "Настройки" else if (skin == "retro" || skin == "winamp") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else "KW Player",
+                        Text(if (tab == "Настройки") stringResource(R.string.settings_title) else if (skin == "retro" || skin == "winamp") "KW PLAYER / ${tab.uppercase(Locale.ROOT)}" else stringResource(R.string.app_name),
                             color = colors.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text(if (tab == "Настройки") "ПЕРСОНАЛИЗАЦИЯ И ПАРАМЕТРЫ" else if (skin == "winamp") "WINAMP MODERN SKIN • LOCAL MEDIA" else "ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР",
+                        Text(if (tab == "Настройки") stringResource(R.string.settings_subtitle) else if (skin == "winamp") stringResource(R.string.winamp_subtitle) else stringResource(R.string.local_player_subtitle),
                         color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
                     }
                     TextButton(onClick = { searchExpanded = !searchExpanded }) {
-                        Text("⌕", color = colors.accent, fontSize = 23.sp)
+                        Text(stringResource(R.string.search), color = colors.accent, fontSize = 14.sp)
                     }
                     TextButton(onClick = { tab = if (tab == "Настройки") "Видео" else "Настройки" }) {
-                        Text(if (tab == "Настройки") "←" else "⚙", color = colors.accent, fontSize = 22.sp)
+                        Text(if (tab == "Настройки") stringResource(R.string.back) else "⚙", color = colors.accent, fontSize = 22.sp)
                     }
                 }
 
@@ -339,7 +339,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                         value = query,
                         onValueChange = { query = it },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        label = { Text("Поиск по медиатеке") },
+                        label = { Text(stringResource(R.string.search_library)) },
                         singleLine = true
                     )
                 }
@@ -727,14 +727,14 @@ private fun LibraryControls(
 ) {
     OutlinedTextField(
         value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(),
-        label = { Text("Поиск по названию") }, singleLine = true
+        label = { Text(stringResource(R.string.search_by_name)) }, singleLine = true
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { onSort(!newest) }) {
-            Text(if (newest) "Сначала новые" else "По имени А–Я", color = colors.accent)
+            Text(if (newest) stringResource(R.string.sort_oldest_first) else stringResource(R.string.sort_name_az), color = colors.accent)
         }
         TextButton(onClick = { onFavorites(!favoritesOnly) }) {
-            Text(if (favoritesOnly) "Все файлы" else "Только избранное", color = colors.accent)
+            Text(if (favoritesOnly) stringResource(R.string.all_files) else stringResource(R.string.favorites_only), color = colors.accent)
         }
     }
 }
