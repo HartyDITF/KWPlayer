@@ -40,6 +40,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import fyi.kiyori.modernmediaplayer.data.settings.KwSettingsRepository
 import java.util.Locale
 import kotlin.math.roundToInt
