@@ -21,7 +21,10 @@ data class KwSettings(
     val skin: String = "standard",
     val accentArgb: Int = 0xFFFF8F1F.toInt(),
     val backgroundPlaybackEnabled: Boolean = false,
-    val videoLayout: Int = 0
+    val videoLayout: Int = 0,
+    val videoAspectMode: Int = 0,
+    val videoSideFieldMode: Int = 0,
+    val keepScreenOn: Boolean = true
 )
 
 class KwSettingsRepository(context: Context) {
@@ -38,7 +41,10 @@ class KwSettingsRepository(context: Context) {
             },
             accentArgb = it[ACCENT] ?: 0xFFFF8F1F.toInt(),
             backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false,
-            videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2)
+            videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2),
+            videoAspectMode = (it[VIDEO_ASPECT_MODE] ?: 0).coerceIn(0, 2),
+            videoSideFieldMode = (it[VIDEO_SIDE_FIELD_MODE] ?: 0).coerceIn(0, 2),
+            keepScreenOn = it[KEEP_SCREEN_ON] ?: true
         )
     }
 
@@ -52,7 +58,20 @@ class KwSettingsRepository(context: Context) {
         store.edit { it[VIDEO_LAYOUT] = value.coerceIn(0, 2) }
     }
 
+    suspend fun setVideoAspectMode(value: Int) {
+        store.edit { it[VIDEO_ASPECT_MODE] = value.coerceIn(0, 2) }
+    }
+    suspend fun setVideoSideFieldMode(value: Int) {
+        store.edit { it[VIDEO_SIDE_FIELD_MODE] = value.coerceIn(0, 2) }
+    }
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        store.edit { it[KEEP_SCREEN_ON] = enabled }
+    }
+
     private companion object {
+        val VIDEO_ASPECT_MODE = intPreferencesKey("video_aspect_mode")
+        val VIDEO_SIDE_FIELD_MODE = intPreferencesKey("video_side_field_mode")
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val VIDEO_LAYOUT = intPreferencesKey("video_layout")
         val SKIN = stringPreferencesKey("skin")
         val ACCENT = intPreferencesKey("accent_argb")
