@@ -18,4 +18,5 @@
     <string name="sort_name_az">По имени А–Я</string>
     <string name="all_files">Все файлы</string>
     <string name="favorites_only">Только избранное</string>
+    <string name="recent_files">Недавние</string>
 </resources>
