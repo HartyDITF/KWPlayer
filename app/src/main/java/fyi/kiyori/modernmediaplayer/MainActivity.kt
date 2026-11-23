@@ -228,7 +228,15 @@ private fun KwPlayerScreen(controller: MediaController?) {
     LaunchedEffect(settingsRepository) {
         settingsRepository.settings.collect { settings ->
             skin = settings.skin
-            accentColor = Color(settings.accentArgb)
+            val storedAccent = Color(settings.accentArgb)
+            if (storedAccent.alpha > 0f) {
+                accentColor = storedAccent
+            } else {
+                // Repair transparent ARGB values saved by the previous packed-Color conversion.
+                val fallbackAccent = kwSkin(settings.skin).accent
+                accentColor = fallbackAccent
+                settingsScope.launch { settingsRepository.setAccent(fallbackAccent.toArgb()) }
+            }
             backgroundPlaybackEnabled = settings.backgroundPlaybackEnabled
             videoLayout = settings.videoLayout
         }
