@@ -834,6 +834,7 @@ fun VideoPlayerScreen(
         }
     }
 
+}
 
 private fun saveSnapshotToGallery(context: android.content.Context, bitmap: Bitmap): Boolean = runCatching {
     val values = ContentValues().apply {
