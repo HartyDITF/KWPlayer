@@ -715,35 +715,66 @@ fun VideoPlayerScreen(
     }
 
     if (settingsOpen) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { settingsOpen = false },
-            title = { Text("Настройки видео") },
-            text = {
-                Column(
-                    Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("ФОРМАТ ИЗОБРАЖЕНИЯ", color = accent, style = MaterialTheme.typography.labelMedium)
+                    Text("Настройки", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { settingsOpen = false }) { Text("Готово", color = accent) }
+                }
+
+                Text("Формат кадра", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     listOf(
                         "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
-                        "Заполнить экран" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                        "Заполнить" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
                         "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL,
                         "4:3" to 5
                     ).forEach { (label, mode) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = aspectMode == mode, onClick = { updateAspectMode(mode) })
-                            Text(label, modifier = Modifier.padding(start = 4.dp))
-                        }
+                        FilterChip(
+                            selected = aspectMode == mode,
+                            onClick = { updateAspectMode(mode) },
+                            label = { Text(label) }
+                        )
                     }
-                    Divider()
-                    Text("ЦВЕТ БОКОВЫХ ПОЛЕЙ", color = accent, style = MaterialTheme.typography.labelMedium)
-                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Цвет акцента" to 2, "Пользовательский" to 3).forEach { (label, mode) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = sideFieldMode == mode, onClick = { updateSideFieldMode(mode) })
-                            Text(label, modifier = Modifier.padding(start = 4.dp))
-                        }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Цвет боковых полей", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Акцент" to 2, "Свой цвет" to 3).forEach { (label, mode) ->
+                        FilterChip(
+                            selected = sideFieldMode == mode,
+                            onClick = { updateSideFieldMode(mode) },
+                            label = { Text(label) }
+                        )
                     }
-                    if (sideFieldMode == 3) {
+                }
+                if (sideFieldMode == 3) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         OutlinedTextField(
                             value = customSideFieldColorText,
                             onValueChange = { value ->
@@ -754,50 +785,54 @@ fun VideoPlayerScreen(
                                     if (parsed != null) updateCustomSideFieldColor(parsed)
                                 }
                             },
-                            label = { Text("HEX-код цвета") },
+                            label = { Text("HEX") },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f)
                         )
-                        Text("Предпросмотр цвета", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         Box(
-                            Modifier.fillMaxWidth().height(28.dp)
-                                .background(Color(customSideFieldColorArgb), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                        )
-                    }
-                    Divider()
-                    Text("ШАГ ПЕРЕМОТКИ", color = accent, style = MaterialTheme.typography.labelMedium)
-                    listOf(5, 10, 15, 30).forEach { seconds ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = seekIntervalSeconds == seconds, onClick = { updateSeekInterval(seconds) })
-                            Text("$seconds секунд", modifier = Modifier.padding(start = 4.dp))
-                        }
-                    }
-                    Divider()
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Не выключать экран")
-                            Text("Пока видео воспроизводится", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(checked = keepScreenOn, onCheckedChange = updateKeepScreenOn)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Фоновое воспроизведение")
-                            Text("Продолжать звук после сворачивания", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(
-                            checked = backgroundPlaybackEnabled,
-                            onCheckedChange = onBackgroundPlaybackChange
+                            Modifier.size(width = 52.dp, height = 48.dp)
+                                .background(Color(customSideFieldColorArgb), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
                         )
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { settingsOpen = false }) { Text("Готово", color = accent) }
+
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text("Шаг перемотки", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(5, 10, 15, 30).forEach { seconds ->
+                        FilterChip(
+                            selected = seekIntervalSeconds == seconds,
+                            onClick = { updateSeekInterval(seconds) },
+                            label = { Text("$seconds сек") }
+                        )
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Не выключать экран", style = MaterialTheme.typography.bodyLarge)
+                        Text("Во время просмотра", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = keepScreenOn, onCheckedChange = updateKeepScreenOn)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Фоновое воспроизведение", style = MaterialTheme.typography.bodyLarge)
+                        Text("Продолжать звук после сворачивания", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(
+                        checked = backgroundPlaybackEnabled,
+                        onCheckedChange = onBackgroundPlaybackChange
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
             }
-        )
+        }
     }
-}
 
 
 private fun saveSnapshotToGallery(context: android.content.Context, bitmap: Bitmap): Boolean = runCatching {
