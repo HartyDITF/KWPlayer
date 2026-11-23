@@ -402,7 +402,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                         }
                         "Аудио" -> {
                             PageTitle("Аудио", "Музыкальная библиотека", colors)
-                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false }, colors)
                             MediaList(
                                 items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet()),
                                 favorites = favorites, colors = colors, skin = skin,
