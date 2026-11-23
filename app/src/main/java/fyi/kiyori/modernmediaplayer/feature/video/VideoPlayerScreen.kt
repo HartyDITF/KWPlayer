@@ -1,7 +1,14 @@
 package fyi.kiyori.modernmediaplayer.feature.video
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.PixelCopy
 import android.graphics.drawable.ColorDrawable
+import android.content.ContentValues
+import android.provider.MediaStore
+import android.view.SurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.app.PictureInPictureParams
 import android.os.Build
 import android.util.Rational
@@ -39,6 +46,8 @@ import androidx.media3.session.MediaController
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -47,6 +56,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.abs
 
+@OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
     controller: MediaController?,
@@ -71,6 +81,8 @@ fun VideoPlayerScreen(
     var speedMenu by remember { mutableStateOf(false) }
     var aspectMenu by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    var pendingSnapshot by remember { mutableStateOf<Bitmap?>(null) }
     var sideFieldMode by remember { mutableIntStateOf(0) }
     var keepScreenOn by remember { mutableStateOf(true) }
     var seekIntervalSeconds by remember { mutableIntStateOf(10) }
@@ -126,6 +138,47 @@ fun VideoPlayerScreen(
             sideFieldMode = settings.videoSideFieldMode
             keepScreenOn = settings.keepScreenOn
             seekIntervalSeconds = settings.seekIntervalSeconds
+        }
+    }
+
+    val snapshotDocumentPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
+        val bitmap = pendingSnapshot
+        pendingSnapshot = null
+        if (uri != null && bitmap != null) {
+            settingsScope.launch {
+                val saved = withContext(Dispatchers.IO) { writeSnapshotToUri(context, uri, bitmap) }
+                bitmap.recycle()
+                subtitleNotice = if (saved) "Кадр сохранён" else "Не удалось сохранить кадр"
+            }
+        } else {
+            bitmap?.recycle()
+        }
+    }
+
+    val captureVideoFrame: () -> Unit = {
+        val surface = playerView?.videoSurfaceView as? SurfaceView
+        when {
+            controller?.isPlaying == true -> subtitleNotice = "Поставьте видео на паузу для снимка"
+            surface == null || !surface.isAttachedToWindow || surface.width <= 0 || surface.height <= 0 ->
+                subtitleNotice = "Видеоповерхность пока недоступна"
+            else -> {
+                val bitmap = Bitmap.createBitmap(surface.width, surface.height, Bitmap.Config.ARGB_8888)
+                PixelCopy.request(surface, bitmap, { result ->
+                    if (result != PixelCopy.SUCCESS) {
+                        bitmap.recycle()
+                        subtitleNotice = "Не удалось получить кадр (${result})"
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        settingsScope.launch {
+                            val saved = withContext(Dispatchers.IO) { saveSnapshotToGallery(context, bitmap) }
+                            bitmap.recycle()
+                            subtitleNotice = if (saved) "Кадр сохранён в Галерею" else "Не удалось сохранить кадр"
+                        }
+                    } else {
+                        pendingSnapshot = bitmap
+                        snapshotDocumentPicker.launch("KWPlayer_${System.currentTimeMillis()}.png")
+                    }
+                }, Handler(Looper.getMainLooper()))
+            }
         }
     }
 
@@ -274,6 +327,7 @@ fun VideoPlayerScreen(
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
+                    playerView = this
                     useController = false
                     resizeMode = playerResizeMode
                     setKeepContentOnPlayerReset(true)
@@ -392,6 +446,9 @@ fun VideoPlayerScreen(
                         Column(Modifier.weight(1f)) {
                             Text(title, color = Color.White, maxLines = 1)
                             Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                        }
+                        TextButton(onClick = { captureVideoFrame() }, enabled = controller != null && !isPlaying) {
+                            Text("Кадр", color = if (controller != null && !isPlaying) accent else Color.Gray)
                         }
                         TextButton(onClick = { controlsLocked = true; controlsVisible = false }) {
                             Text("🔒", color = Color.White, fontSize = 16.sp)
@@ -712,6 +769,43 @@ fun VideoPlayerScreen(
     }
 }
 
+
+private fun saveSnapshotToGallery(context: android.content.Context, bitmap: Bitmap): Boolean = runCatching {
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, "KWPlayer_${System.currentTimeMillis()}.png")
+        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/KW Player")
+        put(MediaStore.Images.Media.IS_PENDING, 1)
+    }
+    val resolver = context.contentResolver
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        ?: return@runCatching false
+    try {
+        val written = resolver.openOutputStream(uri)?.use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        } == true
+        if (!written) {
+            resolver.delete(uri, null, null)
+            false
+        } else {
+            val published = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+            resolver.update(uri, published, null, null) > 0
+        }
+    } catch (error: Exception) {
+        resolver.delete(uri, null, null)
+        throw error
+    }
+}.getOrDefault(false)
+
+private fun writeSnapshotToUri(
+    context: android.content.Context,
+    uri: android.net.Uri,
+    bitmap: Bitmap
+): Boolean = runCatching {
+    context.contentResolver.openOutputStream(uri)?.use { output ->
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+    } == true
+}.getOrDefault(false)
 
 private fun loadVideoBookmarks(
     preferences: android.content.SharedPreferences,
