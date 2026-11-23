@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">KWPlayer</string>
+    <string name="app_name">KW Player</string>
+    <string name="tab_video">Видео</string>
+    <string name="tab_audio">Аудио</string>
+    <string name="tab_browse">Обзор</string>
+    <string name="tab_playlist">Плейлист</string>
+    <string name="tab_more">Ещё</string>
 </resources>
