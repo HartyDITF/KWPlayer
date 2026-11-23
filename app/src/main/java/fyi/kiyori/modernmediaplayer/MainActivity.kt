@@ -62,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -320,10 +321,10 @@ private fun KwPlayerScreen(controller: MediaController?) {
                 accentColor = kwSkin(key).accent
                 settingsScope.launch {
                     settingsRepository.setSkin(key)
-                    settingsRepository.setAccent(kwSkin(key).accent.value.toLong().toInt())
+                    settingsRepository.setAccent(kwSkin(key).accent.toArgb())
                 }
             },
-            onAccent = { color -> accentColor = color; settingsScope.launch { settingsRepository.setAccent(color.value.toLong().toInt()) } },
+            onAccent = { color -> accentColor = color; settingsScope.launch { settingsRepository.setAccent(color.toArgb()) } },
             onDismiss = { showSkins = false }
         )
     }
