@@ -32,6 +32,14 @@ class PlaybackService : MediaSessionService() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) persistPosition(player)
             }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) persistPosition(player, completed = true)
+            }
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (!player.isPlaying && events.contains(Player.EVENT_POSITION_DISCONTINUITY)) {
+                    persistPosition(player)
+                }
+            }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 // Listener callbacks run on the player's application looper (main).
                 // Capture player state here; only database work runs on Dispatchers.IO.
@@ -53,13 +61,15 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
-    private fun persistPosition(player: ExoPlayer) {
+    private fun persistPosition(player: ExoPlayer, completed: Boolean = false) {
         // Read ExoPlayer state on its application looper before switching to IO.
         val uri = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
-        val position = player.currentPosition.coerceAtLeast(0L)
+        val duration = player.duration.takeIf { it > 0L } ?: return
+        val position = if (completed) 0L else player.currentPosition.coerceIn(0L, duration)
         serviceScope.launch {
             runCatching {
-                KwDatabase.get(this@PlaybackService).mediaDao().updatePosition(uri, position)
+                KwDatabase.get(this@PlaybackService).mediaDao()
+                    .updatePlaybackProgress(uri, position, duration)
             }
         }
     }
