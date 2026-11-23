@@ -560,16 +560,26 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             }
                         }
                     }
-                    if (selectedUri != null && tab != "Видео" && tab != "Аудио" && activePlayerScreen == "library") {
-                        MiniPlayback(colors, selectedName, isPlaying, onToggle = {
-                            if (isPlaying) controller?.pause() else controller?.play()
-                        }, onStop = {
-                            controller?.stop(); controller?.clearMediaItems()
-                            selectedUri = null; selectedName = null
-                        })
-                    }
                     playbackError?.let { Text(it, color = Color(0xFFFF8B8B), fontSize = 12.sp) }
                     Spacer(Modifier.height(8.dp))
+                }
+
+                if (selectedUri != null && activePlayerScreen == "library") {
+                    MiniPlayback(
+                        colors = colors,
+                        title = selectedName,
+                        playing = isPlaying,
+                        onOpen = { activePlayerScreen = if (isVideoItem) "video" else "audio" },
+                        onToggle = { if (isPlaying) controller?.pause() else controller?.play() },
+                        onStop = {
+                            controller?.stop()
+                            controller?.clearMediaItems()
+                            selectedUri = null
+                            selectedName = null
+                            playbackError = null
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
 
                 if (!topTabs(skin)) {
@@ -831,10 +841,14 @@ private fun formatBytes(size: Long): String = when {
 @androidx.compose.runtime.Composable
 private fun MiniPlayback(
     colors: PlayerColors, title: String?, playing: Boolean,
-    onToggle: () -> Unit, onStop: () -> Unit
+    onOpen: () -> Unit, onToggle: () -> Unit, onStop: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(12.dp)).padding(8.dp),
+        modifier.fillMaxWidth()
+            .background(colors.surface, RoundedCornerShape(12.dp))
+            .clickable(onClick = onOpen)
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("♫", color = colors.accent, fontSize = 22.sp)
