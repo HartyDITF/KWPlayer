@@ -415,7 +415,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                         }
                         "Аудио" -> {
                             PageTitle("Аудио", "Музыкальная библиотека", colors)
-                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false; unwatchedOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false; unwatchedOnly = false }, unwatchedOnly, { unwatchedOnly = it; favoritesOnly = false; recentOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false; unwatchedOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false; unwatchedOnly = false }, unwatchedOnly, { unwatchedOnly = it; favoritesOnly = false; recentOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors, showUnwatched = false)
                             MediaList(
                                 items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet(), selectedFolderUri),
                                 favorites = favorites, colors = colors, skin = skin,
@@ -747,7 +747,7 @@ private fun LibraryControls(
     recentOnly: Boolean, onRecent: (Boolean) -> Unit,
     unwatchedOnly: Boolean, onUnwatched: (Boolean) -> Unit,
     folders: Set<String>, selectedFolderUri: String?, onFolder: (String?) -> Unit,
-    colors: PlayerColors
+    colors: PlayerColors, showUnwatched: Boolean = true
 ) {
     OutlinedTextField(
         value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(),
@@ -768,8 +768,10 @@ private fun LibraryControls(
         TextButton(onClick = { onFavorites(!favoritesOnly) }) {
             Text(if (favoritesOnly) stringResource(R.string.all_files) else stringResource(R.string.favorites_only), color = colors.accent)
         }
-        TextButton(onClick = { onUnwatched(!unwatchedOnly) }) {
-            Text(if (unwatchedOnly) stringResource(R.string.all_files) else stringResource(R.string.unwatched_only), color = colors.accent)
+        if (showUnwatched) {
+            TextButton(onClick = { onUnwatched(!unwatchedOnly) }) {
+                Text(if (unwatchedOnly) stringResource(R.string.all_files) else stringResource(R.string.unwatched_only), color = colors.accent)
+            }
         }
     }
     if (folders.isNotEmpty()) {
