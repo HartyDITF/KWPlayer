@@ -14,8 +14,7 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +41,7 @@ import androidx.media3.ui.TrackSelectionDialogBuilder
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.abs
 
 @Composable
 fun VideoPlayerScreen(
@@ -59,6 +59,8 @@ fun VideoPlayerScreen(
     var speed by remember { mutableFloatStateOf(1f) }
     var fullscreen by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var controlsInteractionKey by remember { mutableIntStateOf(0) }
+    val revealControls: () -> Unit = { controlsVisible = true; controlsInteractionKey++ }
     var controlsLocked by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
     var aspectMenu by remember { mutableStateOf(false) }
@@ -194,7 +196,7 @@ fun VideoPlayerScreen(
         onDispose { controller?.removeListener(listener) }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying) {
+    LaunchedEffect(controlsVisible, isPlaying, controlsInteractionKey) {
         if (controlsVisible && isPlaying) {
             delay(4500)
             controlsVisible = false
@@ -230,7 +232,7 @@ fun VideoPlayerScreen(
             Modifier.fillMaxSize()
                 .pointerInput(controller, controlsLocked) {
                 detectTapGestures(
-                    onTap = { if (!controlsLocked) controlsVisible = !controlsVisible },
+                    onTap = { if (!controlsLocked) { controlsVisible = !controlsVisible; controlsInteractionKey++ } },
                     onDoubleTap = { offset ->
                         if (!controlsLocked) {
                             when {
@@ -243,58 +245,53 @@ fun VideoPlayerScreen(
                     }
                 )
                 }
-                .pointerInput(controller, duration, controlsLocked) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        if (controlsLocked || duration <= 0L) return@detectHorizontalDragGestures
-                        dragSeekPosition = controller?.currentPosition?.coerceIn(0L, duration) ?: 0L
-                        gestureHint = formatVideoTime(dragSeekPosition)
-                        controlsVisible = true
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        if (controlsLocked || duration <= 0L) return@detectHorizontalDragGestures
-                        change.consume()
-                        val delta = (dragAmount / size.width.coerceAtLeast(1).toFloat() * duration).toLong()
-                        dragSeekPosition = (dragSeekPosition + delta).coerceIn(0L, duration)
-                        gestureHint = formatVideoTime(dragSeekPosition)
-                    },
-                    onDragEnd = {
-                        controller?.seekTo(dragSeekPosition)
-                        gestureHint = null
-                    },
-                    onDragCancel = { gestureHint = null }
-                )
-            }.pointerInput(activity, audioManager, controlsLocked) {
-                detectVerticalDragGestures(
-                    onDragStart = { offset ->
-                        if (controlsLocked) return@detectVerticalDragGestures
-                        dragStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                        dragStartBrightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
-                        gestureHint = if (offset.x < size.width / 2f) "Яркость" else "Громкость"
-                        controlsVisible = true
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        if (controlsLocked) return@detectVerticalDragGestures
-                        val fraction = (-dragAmount / size.height.toFloat()).coerceIn(-0.08f, 0.08f)
-                        if (change.position.x < size.width / 2f) {
-                            val attributes = activity?.window?.attributes ?: return@detectVerticalDragGestures
-                            val current = attributes.screenBrightness.takeIf { it >= 0f } ?: dragStartBrightness
-                            val next = (current + fraction).coerceIn(0.02f, 1f)
-                            attributes.screenBrightness = next
-                            activity.window.attributes = attributes
-                            gestureHint = "Яркость ${(next * 100).roundToInt()}%"
-                        } else {
-                            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                            val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                            val delta = (fraction * max * 2f).roundToInt()
-                            val next = (current + delta).coerceIn(0, max)
-                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, next, 0)
-                            gestureHint = "Громкость ${(next * 100f / max).roundToInt()}%"
-                        }
-                    },
-                    onDragEnd = { gestureHint = null },
-                    onDragCancel = { gestureHint = null }
-                )
+                .pointerInput(activity, audioManager, controller, duration, controlsLocked) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            if (!controlsLocked) {
+                                dragSeekPosition = controller?.currentPosition?.coerceIn(0L, duration.coerceAtLeast(0L)) ?: 0L
+                                dragStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                dragStartBrightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
+                                gestureHint = if (offset.x < size.width / 2f) "Яркость / перемотка" else "Громкость / перемотка"
+                                revealControls()
+                            }
+                        },
+                        onDrag = { change, dragAmount ->
+                            if (!controlsLocked) {
+                                change.consume()
+                                if (abs(dragAmount.x) >= abs(dragAmount.y)) {
+                                    if (duration > 0L) {
+                                        val delta = (dragAmount.x / size.width.coerceAtLeast(1).toFloat() * duration).toLong()
+                                        dragSeekPosition = (dragSeekPosition + delta).coerceIn(0L, duration)
+                                        gestureHint = formatVideoTime(dragSeekPosition)
+                                    }
+                                } else if (change.position.x < size.width / 2f) {
+                                    val attributes = activity?.window?.attributes ?: return@detectDragGestures
+                                    val current = attributes.screenBrightness.takeIf { it >= 0f } ?: dragStartBrightness
+                                    val fraction = (-dragAmount.y / size.height.coerceAtLeast(1).toFloat()).coerceIn(-0.08f, 0.08f)
+                                    val next = (current + fraction).coerceIn(0.02f, 1f)
+                                    attributes.screenBrightness = next
+                                    activity.window.attributes = attributes
+                                    gestureHint = "Яркость ${(next * 100).roundToInt()}%"
+                                } else {
+                                    val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                    val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                    val fraction = (-dragAmount.y / size.height.coerceAtLeast(1).toFloat()).coerceIn(-0.08f, 0.08f)
+                                    val delta = (fraction * max * 2f).roundToInt()
+                                    val next = (current + delta).coerceIn(0, max)
+                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, next, 0)
+                                    gestureHint = "Громкость ${(next * 100f / max).roundToInt()}%"
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            if (!controlsLocked && duration > 0L && gestureHint?.matches(Regex("\\d{2}:\\d{2}(:\\d{2})?")) == true) {
+                                controller?.seekTo(dragSeekPosition)
+                            }
+                            gestureHint = null
+                        },
+                        onDragCancel = { gestureHint = null }
+                    )
                 }
         )
 
