@@ -56,7 +56,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.abs
 
-@OptIn(androidx.media3.common.util.UnstableApi::class)
+@OptIn(androidx.media3.common.util.UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
     controller: MediaController?,
