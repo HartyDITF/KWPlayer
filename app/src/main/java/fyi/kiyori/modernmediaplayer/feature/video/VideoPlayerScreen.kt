@@ -274,8 +274,7 @@ fun VideoPlayerScreen(
                     },
                     onDragCancel = { gestureHint = null }
                 )
-            })
-            Box(Modifier.fillMaxSize().pointerInput(activity, audioManager, controlsLocked) {
+            }.pointerInput(activity, audioManager, controlsLocked) {
                 detectVerticalDragGestures(
                     onDragStart = { offset ->
                         if (controlsLocked) return@detectVerticalDragGestures
