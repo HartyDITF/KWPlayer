@@ -185,6 +185,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var query by remember { mutableStateOf("") }
     var sortNewest by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
+    var recentOnly by remember { mutableStateOf(false) }
     var videoLayout by remember { mutableStateOf(0) } // 0: feed, 1: list, 2: grid
     var scanBusy by remember { mutableStateOf(false) }
     var scanMessage by remember { mutableStateOf("Добавь папку и запусти сканирование.") }
@@ -390,9 +391,9 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                     }
                                 }
                             }
-                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false }, colors)
                             MediaList(
-                                items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites),
+                                items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet()),
                                 favorites = favorites, colors = colors, skin = skin, grid = videoLayout == 2, feed = videoLayout == 0,
                                 onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
@@ -403,7 +404,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             PageTitle("Аудио", "Музыкальная библиотека", colors)
                             LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it }, colors)
                             MediaList(
-                                items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites),
+                                items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet()),
                                 favorites = favorites, colors = colors, skin = skin,
                                 onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = false; activePlayerScreen = "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
@@ -683,11 +684,13 @@ private fun startLibraryItem(
 
 private fun filterMedia(
     source: List<LocalMediaItem>, query: String, newest: Boolean,
-    favoritesOnly: Boolean, favorites: Set<String>
+    favoritesOnly: Boolean, favorites: Set<String>, recentOnly: Boolean = false,
+    recent: Set<String> = emptySet()
 ): List<LocalMediaItem> {
     val filtered = source.filter {
         it.name.contains(query, ignoreCase = true) &&
-            (!favoritesOnly || favorites.contains(it.uri.toString()))
+            (!favoritesOnly || favorites.contains(it.uri.toString())) &&
+            (!recentOnly || recent.contains(it.uri.toString()))
     }
     return if (newest) filtered.sortedByDescending { it.modified } else filtered.sortedBy { it.name.lowercase(Locale.ROOT) }
 }
@@ -723,7 +726,8 @@ private fun ActionButton(colors: PlayerColors, label: String, enabled: Boolean =
 @androidx.compose.runtime.Composable
 private fun LibraryControls(
     query: String, onQuery: (String) -> Unit, newest: Boolean, onSort: (Boolean) -> Unit,
-    favoritesOnly: Boolean, onFavorites: (Boolean) -> Unit, colors: PlayerColors
+    favoritesOnly: Boolean, onFavorites: (Boolean) -> Unit,
+    recentOnly: Boolean, onRecent: (Boolean) -> Unit, colors: PlayerColors
 ) {
     OutlinedTextField(
         value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(),
@@ -732,6 +736,9 @@ private fun LibraryControls(
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { onSort(!newest) }) {
             Text(if (newest) stringResource(R.string.sort_oldest_first) else stringResource(R.string.sort_name_az), color = colors.accent)
+        }
+        TextButton(onClick = { onRecent(!recentOnly) }) {
+            Text(if (recentOnly) stringResource(R.string.all_files) else stringResource(R.string.recent_files), color = colors.accent)
         }
         TextButton(onClick = { onFavorites(!favoritesOnly) }) {
             Text(if (favoritesOnly) stringResource(R.string.all_files) else stringResource(R.string.favorites_only), color = colors.accent)
