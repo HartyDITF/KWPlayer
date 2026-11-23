@@ -24,7 +24,8 @@ data class KwSettings(
     val videoLayout: Int = 0,
     val videoAspectMode: Int = 0,
     val videoSideFieldMode: Int = 0,
-    val keepScreenOn: Boolean = true
+    val keepScreenOn: Boolean = true,
+    val seekIntervalSeconds: Int = 10
 )
 
 class KwSettingsRepository(context: Context) {
@@ -44,7 +45,8 @@ class KwSettingsRepository(context: Context) {
             videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2),
             videoAspectMode = when (it[VIDEO_ASPECT_MODE]) { 0, 3, 4, 5 -> it[VIDEO_ASPECT_MODE]!!; else -> 0 },
             videoSideFieldMode = (it[VIDEO_SIDE_FIELD_MODE] ?: 0).coerceIn(0, 2),
-            keepScreenOn = it[KEEP_SCREEN_ON] ?: true
+            keepScreenOn = it[KEEP_SCREEN_ON] ?: true,
+            seekIntervalSeconds = when (it[SEEK_INTERVAL_SECONDS]) { 5, 10, 15, 30 -> it[SEEK_INTERVAL_SECONDS]!!; else -> 10 }
         )
     }
 
@@ -67,11 +69,15 @@ class KwSettingsRepository(context: Context) {
     suspend fun setKeepScreenOn(enabled: Boolean) {
         store.edit { it[KEEP_SCREEN_ON] = enabled }
     }
+    suspend fun setSeekIntervalSeconds(value: Int) {
+        store.edit { it[SEEK_INTERVAL_SECONDS] = if (value in listOf(5, 10, 15, 30)) value else 10 }
+    }
 
     private companion object {
         val VIDEO_ASPECT_MODE = intPreferencesKey("video_aspect_mode")
         val VIDEO_SIDE_FIELD_MODE = intPreferencesKey("video_side_field_mode")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val SEEK_INTERVAL_SECONDS = intPreferencesKey("seek_interval_seconds")
         val VIDEO_LAYOUT = intPreferencesKey("video_layout")
         val SKIN = stringPreferencesKey("skin")
         val ACCENT = intPreferencesKey("accent_argb")
