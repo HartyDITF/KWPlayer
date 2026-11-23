@@ -81,6 +81,8 @@ fun VideoPlayerScreen(
     var bookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkUri by remember { mutableStateOf<String?>(null) }
     var bookmarks by remember { mutableStateOf<List<Long>>(emptyList()) }
+    var abStartPosition by remember(controller) { mutableStateOf<Long?>(null) }
+    var abEndPosition by remember(controller) { mutableStateOf<Long?>(null) }
     val bookmarkPreferences = remember(context) {
         context.getSharedPreferences("kw_video_bookmarks", android.content.Context.MODE_PRIVATE)
     }
@@ -230,6 +232,11 @@ fun VideoPlayerScreen(
                 shuffleEnabled = shuffleModeEnabled
             }
 
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                abStartPosition = null
+                abEndPosition = null
+            }
+
             override fun onEvents(player: Player, events: Player.Events) {
                 duration = player.duration.takeIf { it > 0L } ?: 0L
             }
@@ -239,6 +246,17 @@ fun VideoPlayerScreen(
         repeatMode = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
         shuffleEnabled = controller?.shuffleModeEnabled ?: false
         onDispose { controller?.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller, abStartPosition, abEndPosition) {
+        val player = controller ?: return@LaunchedEffect
+        val start = abStartPosition ?: return@LaunchedEffect
+        val end = abEndPosition ?: return@LaunchedEffect
+        if (end <= start) return@LaunchedEffect
+        while (true) {
+            if (player.currentPosition >= end) player.seekTo(start)
+            delay(100)
+        }
     }
 
     LaunchedEffect(controlsVisible, isPlaying, controlsInteractionKey) {
@@ -461,6 +479,39 @@ fun VideoPlayerScreen(
                                     else -> "Повтор: выкл."
                                 },
                                 color = accent
+                            )
+                        }
+                        TextButton(onClick = {
+                            val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                            when {
+                                abStartPosition == null -> {
+                                    abStartPosition = position
+                                    abEndPosition = null
+                                    subtitleNotice = "Точка A: ${formatVideoTime(position)}"
+                                }
+                                abEndPosition == null -> {
+                                    if (position <= (abStartPosition ?: 0L) + 500L) {
+                                        subtitleNotice = "Точка B должна быть позже точки A"
+                                    } else {
+                                        abEndPosition = position
+                                        subtitleNotice = "Повтор A–B включён"
+                                    }
+                                }
+                                else -> {
+                                    abStartPosition = null
+                                    abEndPosition = null
+                                    subtitleNotice = "Повтор A–B выключен"
+                                }
+                            }
+                            controlsVisible = true
+                        }, enabled = controller?.currentMediaItem != null) {
+                            Text(
+                                when {
+                                    abStartPosition == null -> "A–B"
+                                    abEndPosition == null -> "A: ${formatVideoTime(abStartPosition ?: 0L)}"
+                                    else -> "A–B: повтор"
+                                },
+                                color = if (abEndPosition != null) accent else Color.White
                             )
                         }
                         TextButton(onClick = {
