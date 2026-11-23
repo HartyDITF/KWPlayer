@@ -248,7 +248,8 @@ fun VideoPlayerScreen(
         onDispose { controller?.removeListener(listener) }
     }
 
-    LaunchedEffect(controller, abStartPosition, abEndPosition) {
+    LaunchedEffect(controller, abStartPosition, abEndPosition, isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
         val player = controller ?: return@LaunchedEffect
         val start = abStartPosition ?: return@LaunchedEffect
         val end = abEndPosition ?: return@LaunchedEffect
