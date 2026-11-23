@@ -61,7 +61,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
-    private fun persistPosition(player: ExoPlayer, completed: Boolean = false) {
+    private fun persistPosition(player: Player, completed: Boolean = false) {
         // Read ExoPlayer state on its application looper before switching to IO.
         val uri = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
         val duration = player.duration.takeIf { it > 0L } ?: return
