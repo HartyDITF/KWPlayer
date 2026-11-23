@@ -447,9 +447,6 @@ fun VideoPlayerScreen(
                             Text(title, color = Color.White, maxLines = 1)
                             Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
                         }
-                        TextButton(onClick = { captureVideoFrame() }, enabled = controller != null && !isPlaying) {
-                            Text("Кадр", color = if (controller != null && !isPlaying) accent else Color.Gray)
-                        }
                         TextButton(onClick = { controlsLocked = true; controlsVisible = false }) {
                             Text("🔒", color = Color.White, fontSize = 16.sp)
                         }
@@ -498,6 +495,9 @@ fun VideoPlayerScreen(
                         TextButton(onClick = {
                             subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
                         }) { Text("Файл субтитров", color = accent) }
+                        TextButton(onClick = { captureVideoFrame() }, enabled = controller != null && !isPlaying) {
+                            Text("Кадр", color = if (controller != null && !isPlaying) accent else Color.Gray)
+                        }
                         TextButton(onClick = {
                             val uri = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
                             if (uri != null) {
