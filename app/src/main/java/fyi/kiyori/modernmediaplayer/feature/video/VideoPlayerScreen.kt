@@ -84,6 +84,8 @@ fun VideoPlayerScreen(
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var pendingSnapshot by remember { mutableStateOf<Bitmap?>(null) }
     var sideFieldMode by remember { mutableIntStateOf(0) }
+    var customSideFieldColorArgb by remember { mutableIntStateOf(0xFF202020.toInt()) }
+    var customSideFieldColorText by remember { mutableStateOf("202020") }
     var keepScreenOn by remember { mutableStateOf(true) }
     var seekIntervalSeconds by remember { mutableIntStateOf(10) }
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
@@ -103,6 +105,7 @@ fun VideoPlayerScreen(
     val sideFieldColor = when (sideFieldMode) {
         1 -> Color(0xFF101419)
         2 -> accent.copy(alpha = 0.24f)
+        3 -> Color(customSideFieldColorArgb)
         else -> Color.Black
     }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
@@ -116,6 +119,10 @@ fun VideoPlayerScreen(
     val updateSideFieldMode: (Int) -> Unit = { mode ->
         sideFieldMode = mode
         settingsScope.launch { settingsRepository.setVideoSideFieldMode(mode) }
+    }
+    val updateCustomSideFieldColor: (Int) -> Unit = { argb ->
+        customSideFieldColorArgb = argb
+        settingsScope.launch { settingsRepository.setVideoSideFieldCustomColor(argb) }
     }
     val updateKeepScreenOn: (Boolean) -> Unit = { enabled ->
         keepScreenOn = enabled
@@ -136,6 +143,8 @@ fun VideoPlayerScreen(
         settingsRepository.settings.collect { settings ->
             aspectMode = settings.videoAspectMode
             sideFieldMode = settings.videoSideFieldMode
+            customSideFieldColorArgb = settings.videoSideFieldCustomColorArgb
+            customSideFieldColorText = String.format(Locale.ROOT, "%08X", settings.videoSideFieldCustomColorArgb).takeLast(6)
             keepScreenOn = settings.keepScreenOn
             seekIntervalSeconds = settings.seekIntervalSeconds
         }
@@ -728,11 +737,32 @@ fun VideoPlayerScreen(
                     }
                     Divider()
                     Text("ЦВЕТ БОКОВЫХ ПОЛЕЙ", color = accent, style = MaterialTheme.typography.labelMedium)
-                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Цвет акцента" to 2).forEach { (label, mode) ->
+                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Цвет акцента" to 2, "Пользовательский" to 3).forEach { (label, mode) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = sideFieldMode == mode, onClick = { updateSideFieldMode(mode) })
                             Text(label, modifier = Modifier.padding(start = 4.dp))
                         }
+                    }
+                    if (sideFieldMode == 3) {
+                        OutlinedTextField(
+                            value = customSideFieldColorText,
+                            onValueChange = { value ->
+                                val hex = value.filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }.take(6)
+                                customSideFieldColorText = hex
+                                if (hex.length == 6) {
+                                    val parsed = runCatching { (0xFF000000L or hex.toLong(16)).toInt() }.getOrNull()
+                                    if (parsed != null) updateCustomSideFieldColor(parsed)
+                                }
+                            },
+                            label = { Text("HEX-код цвета") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Предпросмотр цвета", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        Box(
+                            Modifier.fillMaxWidth().height(28.dp)
+                                .background(Color(customSideFieldColorArgb), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        )
                     }
                     Divider()
                     Text("ШАГ ПЕРЕМОТКИ", color = accent, style = MaterialTheme.typography.labelMedium)
