@@ -94,6 +94,7 @@ import fyi.kiyori.modernmediaplayer.feature.nowplaying.NowPlayingScreen
 import fyi.kiyori.modernmediaplayer.feature.video.VideoPlayerScreen
 import fyi.kiyori.modernmediaplayer.feature.themes.ThemesDialog
 import fyi.kiyori.modernmediaplayer.core.design.theme.KwTheme
+import fyi.kiyori.modernmediaplayer.core.design.theme.kwSkin
 
 private data class PlayerColors(
     val background: Color, val surface: Color, val raised: Color,
@@ -103,23 +104,21 @@ private data class PlayerColors(
 private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист")
 private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Обзор" to "▤", "Плейлист" to "≡", "Ещё" to "•••")
 
-private fun colorsForSkin(skin: String) = when (skin) {
-    "winamp" -> PlayerColors(Color(0xFF090E18), Color(0xFF18283B), Color(0xFF243D58), Color(0xFF62C4FF), Color(0xFFF1F6FC), Color(0xFF9AAABD))
-    "spotify" -> PlayerColors(Color(0xFF101010), Color(0xFF181818), Color(0xFF282828), Color(0xFF1ED760), Color.White, Color(0xFFB3B3B3))
-    "oneui" -> PlayerColors(Color(0xFF111318), Color(0xFF1B1E25), Color(0xFF292D36), Color(0xFF8AB4F8), Color(0xFFF3F4F7), Color(0xFFAEB4C0))
-    "amoled" -> PlayerColors(Color.Black, Color(0xFF080808), Color(0xFF171717), Color(0xFF5CF2CF), Color.White, Color(0xFFAAAAAA))
-    else -> PlayerColors(Color(0xFF101419), Color(0xFF1B222B), Color(0xFF27323E), Color(0xFF78B9F2), Color(0xFFF3F6FA), Color(0xFFAAB5C2))
+private fun colorsForSkin(skin: String): PlayerColors {
+    val tokens = kwSkin(skin)
+    return PlayerColors(
+        background = tokens.bg,
+        surface = tokens.surface,
+        raised = tokens.raised,
+        accent = tokens.accent,
+        text = tokens.text,
+        muted = tokens.muted
+    )
 }
 
-private fun skinShape(skin: String) = when (skin) {
-    "amoled" -> RoundedCornerShape(0.dp)
-    "winamp" -> RoundedCornerShape(8.dp)
-    "spotify" -> RoundedCornerShape(18.dp)
-    "oneui" -> RoundedCornerShape(24.dp)
-    else -> RoundedCornerShape(14.dp)
-}
+private fun skinShape(skin: String) = RoundedCornerShape(kwSkin(skin).cornerCard)
 
-private fun topTabs(skin: String) = skin == "winamp"
+private fun topTabs(skin: String) = kwSkin(skin).navOnTop
 
 class MainActivity : ComponentActivity() {
     private val controllerState = mutableStateOf<MediaController?>(null)
@@ -292,7 +291,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
         )
     }
 
-    KwTheme(accent = colors.accent, light = skin == "light") {
+    KwTheme(accent = colors.accent, light = skin == "light" || skin == "classic_vlc", skinId = skin) {
         Surface(Modifier.fillMaxSize(), color = colors.background) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(
