@@ -2,7 +2,7 @@ package fyi.kiyori.modernmediaplayer.feature.video
 
 import android.app.Activity
 import android.graphics.Bitmap
-import android.graphics.PixelCopy
+import android.view.PixelCopy
 import android.graphics.drawable.ColorDrawable
 import android.content.ContentValues
 import android.provider.MediaStore
