@@ -32,7 +32,7 @@ class KwSettingsRepository(context: Context) {
                 "light" -> "standard"
                 "retro" -> "winamp"
                 "neon" -> "amoled"
-                "standard", "winamp", "spotify", "oneui", "amoled" -> it[SKIN]!!
+                "standard", "winamp", "spotify", "oneui", "amoled", "material_you", "classic_vlc" -> it[SKIN]!!
                 else -> "standard"
             },
             accentArgb = it[ACCENT] ?: 0xFFFF8F1F.toInt(),
