@@ -20,7 +20,8 @@ private val Context.kwSettingsDataStore: DataStore<Preferences> by preferencesDa
 data class KwSettings(
     val skin: String = "standard",
     val accentArgb: Int = 0xFFFF8F1F.toInt(),
-    val backgroundPlaybackEnabled: Boolean = false
+    val backgroundPlaybackEnabled: Boolean = false,
+    val videoLayout: Int = 0
 )
 
 class KwSettingsRepository(context: Context) {
@@ -36,7 +37,8 @@ class KwSettingsRepository(context: Context) {
                 else -> "standard"
             },
             accentArgb = it[ACCENT] ?: 0xFFFF8F1F.toInt(),
-            backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false
+            backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false,
+            videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2)
         )
     }
 
@@ -46,7 +48,12 @@ class KwSettingsRepository(context: Context) {
         store.edit { it[BACKGROUND_PLAYBACK] = enabled }
     }
 
+    suspend fun setVideoLayout(value: Int) {
+        store.edit { it[VIDEO_LAYOUT] = value.coerceIn(0, 2) }
+    }
+
     private companion object {
+        val VIDEO_LAYOUT = intPreferencesKey("video_layout")
         val SKIN = stringPreferencesKey("skin")
         val ACCENT = intPreferencesKey("accent_argb")
         val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback_enabled")
