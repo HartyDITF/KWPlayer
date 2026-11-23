@@ -42,7 +42,7 @@ class KwSettingsRepository(context: Context) {
             accentArgb = it[ACCENT] ?: 0xFFFF8F1F.toInt(),
             backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false,
             videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2),
-            videoAspectMode = (it[VIDEO_ASPECT_MODE] ?: 0).coerceIn(0, 2),
+            videoAspectMode = when (it[VIDEO_ASPECT_MODE]) { 0, 3, 4 -> it[VIDEO_ASPECT_MODE]!!; else -> 0 },
             videoSideFieldMode = (it[VIDEO_SIDE_FIELD_MODE] ?: 0).coerceIn(0, 2),
             keepScreenOn = it[KEEP_SCREEN_ON] ?: true
         )
@@ -59,7 +59,7 @@ class KwSettingsRepository(context: Context) {
     }
 
     suspend fun setVideoAspectMode(value: Int) {
-        store.edit { it[VIDEO_ASPECT_MODE] = value.coerceIn(0, 2) }
+        store.edit { it[VIDEO_ASPECT_MODE] = if (value == 0 || value == 3 || value == 4) value else 0 }
     }
     suspend fun setVideoSideFieldMode(value: Int) {
         store.edit { it[VIDEO_SIDE_FIELD_MODE] = value.coerceIn(0, 2) }
