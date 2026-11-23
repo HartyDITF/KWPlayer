@@ -285,7 +285,14 @@ private fun KwPlayerScreen(controller: MediaController?) {
         ThemesDialog(
             selected = skin,
             selectedAccent = accentColor,
-            onSelect = { key ->\n                skin = key\n                accentColor = kwSkin(key).accent\n                settingsScope.launch { settingsRepository.setSkin(key); settingsRepository.setAccent(accentColor.value.toLong().toInt()) }\n            },
+            onSelect = { key ->
+                skin = key
+                accentColor = kwSkin(key).accent
+                settingsScope.launch {
+                    settingsRepository.setSkin(key)
+                    settingsRepository.setAccent(kwSkin(key).accent.value.toLong().toInt())
+                }
+            },
             onAccent = { color -> accentColor = color; settingsScope.launch { settingsRepository.setAccent(color.value.toLong().toInt()) } },
             onDismiss = { showSkins = false }
         )
