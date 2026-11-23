@@ -13,8 +13,8 @@ android {
         applicationId = "fyi.kiyori.modernmediaplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.3.6"
+        versionCode = 9
+        versionName = "0.3.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
