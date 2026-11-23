@@ -52,8 +52,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -166,6 +168,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     val prefs = remember { context.getSharedPreferences("kw_player_settings", android.content.Context.MODE_PRIVATE) }
     var skin by remember { mutableStateOf(prefs.getString("skin", "standard") ?: "standard") }
     var tab by remember { mutableStateOf("Видео") }
+    val tabScrollPositions = remember { mutableStateMapOf<String, Int>() }
     var media by remember { mutableStateOf(MediaLibrary.loadItems(context)) }
     var folders by remember { mutableStateOf(MediaLibrary.folders(context)) }
     var query by remember { mutableStateOf("") }
@@ -349,12 +352,17 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     }
                 }
 
-                Column(
-                    Modifier.weight(1f).fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = if (skin == "amoled") 0.dp else 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                key(tab) {
+                    val tabScrollState = rememberScrollState(tabScrollPositions[tab] ?: 0)
+                    DisposableEffect(tab, tabScrollState) {
+                        onDispose { tabScrollPositions[tab] = tabScrollState.value }
+                    }
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth()
+                            .verticalScroll(tabScrollState)
+                            .padding(horizontal = if (skin == "amoled") 0.dp else 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     when (tab) {
                         "Видео" -> {
                             PageTitle("Видео", "Видеофайлы из выбранных папок", colors)
@@ -562,6 +570,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     }
                     playbackError?.let { Text(it, color = Color(0xFFFF8B8B), fontSize = 12.sp) }
                     Spacer(Modifier.height(8.dp))
+                    }
                 }
 
                 if (selectedUri != null && activePlayerScreen == "library") {
