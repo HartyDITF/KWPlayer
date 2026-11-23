@@ -640,7 +640,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                     }
                 }
             } else if (activePlayerScreen == "video") {
-                Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                Dialog(onDismissRequest = { activePlayerScreen = "library" }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
                     VideoPlayerScreen(
                             controller = controller,
                             title = selectedName ?: "Видео",
