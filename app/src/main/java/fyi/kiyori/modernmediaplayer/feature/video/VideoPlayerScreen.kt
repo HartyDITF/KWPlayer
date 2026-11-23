@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import android.content.pm.ActivityInfo
+import org.json.JSONArray
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -76,6 +77,12 @@ fun VideoPlayerScreen(
     var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
     var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
     var subtitleNotice by remember { mutableStateOf<String?>(null) }
+    var bookmarkDialog by remember { mutableStateOf(false) }
+    var bookmarkUri by remember { mutableStateOf<String?>(null) }
+    var bookmarks by remember { mutableStateOf<List<Long>>(emptyList()) }
+    val bookmarkPreferences = remember(context) {
+        context.getSharedPreferences("kw_video_bookmarks", android.content.Context.MODE_PRIVATE)
+    }
     var gestureHint by remember { mutableStateOf<String?>(null) }
     val audioManager = remember(context) { context.getSystemService(Activity.AUDIO_SERVICE) as AudioManager }
     val sideFieldColor = when (sideFieldMode) {
@@ -403,13 +410,22 @@ fun VideoPlayerScreen(
                         TextButton(onClick = {
                             subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
                         }) { Text("Файл субтитров", color = accent) }
+                        TextButton(onClick = {
+                            val uri = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
+                            if (uri != null) {
+                                bookmarkUri = uri
+                                bookmarks = loadVideoBookmarks(bookmarkPreferences, uri)
+                                bookmarkDialog = true
+                            }
+                        }, enabled = controller?.currentMediaItem != null) { Text("Закладки", color = accent) }
                         Box {
                             TextButton(onClick = { aspectMenu = true }) { Text("Формат кадра", color = accent) }
                             DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
                                 listOf(
                                     "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
                                     "Заполнить" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
-                                    "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                    "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL,
+                                    "4:3" to 5
                                 ).forEach { (label, mode) ->
                                     DropdownMenuItem(
                                         text = { Text(label) },
@@ -518,6 +534,56 @@ fun VideoPlayerScreen(
         }
     }
 
+    if (bookmarkDialog) {
+        AlertDialog(
+            onDismissRequest = { bookmarkDialog = false },
+            title = { Text("Закладки видео") },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TextButton(
+                        onClick = {
+                            val uri = bookmarkUri
+                            val position = controller?.currentPosition
+                            if (uri != null && position != null && position >= 0L) {
+                                if (bookmarks.none { kotlin.math.abs(it - position) < 3000L }) {
+                                    bookmarks = (bookmarks + position).sorted()
+                                    saveVideoBookmarks(bookmarkPreferences, uri, bookmarks)
+                                }
+                            }
+                        },
+                        enabled = controller != null
+                    ) { Text("＋ Сохранить текущий момент", color = accent) }
+                    if (bookmarks.isEmpty()) {
+                        Text("Закладок пока нет", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    bookmarks.forEach { position ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(
+                                onClick = {
+                                    controller?.seekTo(position)
+                                    bookmarkDialog = false
+                                    revealControls()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(formatVideoTime(position), color = MaterialTheme.colorScheme.onSurface) }
+                            TextButton(onClick = {
+                                val uri = bookmarkUri
+                                bookmarks = bookmarks.filterNot { it == position }
+                                if (uri != null) saveVideoBookmarks(bookmarkPreferences, uri, bookmarks)
+                            }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { bookmarkDialog = false }) { Text("Готово", color = accent) }
+            }
+        )
+    }
+
     if (settingsOpen) {
         AlertDialog(
             onDismissRequest = { settingsOpen = false },
@@ -574,6 +640,29 @@ fun VideoPlayerScreen(
     }
 }
 
+
+private fun loadVideoBookmarks(
+    preferences: android.content.SharedPreferences,
+    uri: String
+): List<Long> = runCatching {
+    val values = JSONArray(preferences.getString(uri, "[]") ?: "[]")
+    buildList {
+        for (index in 0 until values.length()) {
+            val position = values.optLong(index, -1L)
+            if (position >= 0L) add(position)
+        }
+    }.distinct().sorted()
+}.getOrDefault(emptyList())
+
+private fun saveVideoBookmarks(
+    preferences: android.content.SharedPreferences,
+    uri: String,
+    positions: List<Long>
+) {
+    val values = JSONArray()
+    positions.distinct().sorted().forEach { values.put(it) }
+    preferences.edit().putString(uri, values.toString()).apply()
+}
 
 @Composable
 private fun VideoTimeline(controller: MediaController?, modifier: Modifier = Modifier) {
