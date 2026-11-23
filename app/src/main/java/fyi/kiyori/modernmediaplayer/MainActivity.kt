@@ -187,6 +187,8 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var sortNewest by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var recentOnly by remember { mutableStateOf(false) }
+    var unwatchedOnly by remember { mutableStateOf(false) }
+    var unwatchedUris by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedFolderUri by remember { mutableStateOf<String?>(null) }
     var videoLayout by remember { mutableStateOf(0) } // 0: feed, 1: list, 2: grid
     var scanBusy by remember { mutableStateOf(false) }
@@ -233,6 +235,15 @@ private fun KwPlayerScreen(controller: MediaController?) {
         val stored = withContext(Dispatchers.IO) { MediaLibrary.loadFromRoom(context) }
         if (stored.isNotEmpty()) media = stored
         else withContext(Dispatchers.IO) { MediaLibrary.saveToRoom(context, media) }
+    }
+
+    LaunchedEffect(context, controller, activePlayerScreen, isPlaying) {
+        if (activePlayerScreen == "library" && !isPlaying) {
+            unwatchedUris = withContext(Dispatchers.IO) {
+                runCatching { fyi.kiyori.modernmediaplayer.data.database.KwDatabase.get(context).mediaDao().getUnwatchedUris().toSet() }
+                    .getOrDefault(emptySet())
+            }
+        }
     }
 
     val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -393,9 +404,9 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                     }
                                 }
                             }
-                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false; unwatchedOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false; unwatchedOnly = false }, unwatchedOnly, { unwatchedOnly = it; favoritesOnly = false; recentOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors)
                             MediaList(
-                                items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet(), selectedFolderUri),
+                                items = filterMedia(media.filter { it.isVideo }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet(), selectedFolderUri, unwatchedOnly, unwatchedUris),
                                 favorites = favorites, colors = colors, skin = skin, grid = videoLayout == 2, feed = videoLayout == 0,
                                 onPlay = { item -> startLibraryItem(item, controller, { selectedUri = it.uri; selectedName = it.name; isVideoItem = it.isVideo; activePlayerScreen = if (it.isVideo) "video" else "audio"; playbackError = null }, context) },
                                 onFavorite = { item -> MediaLibrary.toggleFavorite(context, item.uri.toString()); media = media.toList() }
@@ -404,7 +415,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                         }
                         "Аудио" -> {
                             PageTitle("Аудио", "Музыкальная библиотека", colors)
-                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors)
+                            LibraryControls(query, { query = it }, sortNewest, { sortNewest = it }, favoritesOnly, { favoritesOnly = it; recentOnly = false; unwatchedOnly = false }, recentOnly, { recentOnly = it; favoritesOnly = false; unwatchedOnly = false }, unwatchedOnly, { unwatchedOnly = it; favoritesOnly = false; recentOnly = false }, folders, selectedFolderUri, { selectedFolderUri = it }, colors)
                             MediaList(
                                 items = filterMedia(media.filter { it.isAudio }, query, sortNewest, favoritesOnly, favorites, recentOnly, history.toSet(), selectedFolderUri),
                                 favorites = favorites, colors = colors, skin = skin,
@@ -688,12 +699,14 @@ private fun startLibraryItem(
 private fun filterMedia(
     source: List<LocalMediaItem>, query: String, newest: Boolean,
     favoritesOnly: Boolean, favorites: Set<String>, recentOnly: Boolean = false,
-    recent: Set<String> = emptySet(), selectedFolderUri: String? = null
+    recent: Set<String> = emptySet(), selectedFolderUri: String? = null,
+    unwatchedOnly: Boolean = false, unwatched: Set<String> = emptySet()
 ): List<LocalMediaItem> {
     val filtered = source.filter {
         it.name.contains(query, ignoreCase = true) &&
             (!favoritesOnly || favorites.contains(it.uri.toString())) &&
             (!recentOnly || recent.contains(it.uri.toString())) &&
+            (!unwatchedOnly || unwatched.contains(it.uri.toString())) &&
             (selectedFolderUri == null || MediaLibrary.isInFolder(it.uri, selectedFolderUri))
     }
     return if (newest) filtered.sortedByDescending { it.modified } else filtered.sortedBy { it.name.lowercase(Locale.ROOT) }
@@ -732,6 +745,7 @@ private fun LibraryControls(
     query: String, onQuery: (String) -> Unit, newest: Boolean, onSort: (Boolean) -> Unit,
     favoritesOnly: Boolean, onFavorites: (Boolean) -> Unit,
     recentOnly: Boolean, onRecent: (Boolean) -> Unit,
+    unwatchedOnly: Boolean, onUnwatched: (Boolean) -> Unit,
     folders: Set<String>, selectedFolderUri: String?, onFolder: (String?) -> Unit,
     colors: PlayerColors
 ) {
@@ -743,11 +757,19 @@ private fun LibraryControls(
         TextButton(onClick = { onSort(!newest) }) {
             Text(if (newest) stringResource(R.string.sort_oldest_first) else stringResource(R.string.sort_name_az), color = colors.accent)
         }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         TextButton(onClick = { onRecent(!recentOnly) }) {
             Text(if (recentOnly) stringResource(R.string.all_files) else stringResource(R.string.recent_files), color = colors.accent)
         }
         TextButton(onClick = { onFavorites(!favoritesOnly) }) {
             Text(if (favoritesOnly) stringResource(R.string.all_files) else stringResource(R.string.favorites_only), color = colors.accent)
+        }
+        TextButton(onClick = { onUnwatched(!unwatchedOnly) }) {
+            Text(if (unwatchedOnly) stringResource(R.string.all_files) else stringResource(R.string.unwatched_only), color = colors.accent)
         }
     }
     if (folders.isNotEmpty()) {
