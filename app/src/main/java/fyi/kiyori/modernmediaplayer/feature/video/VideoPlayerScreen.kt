@@ -13,6 +13,7 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -79,6 +80,7 @@ fun VideoPlayerScreen(
     }
     var dragStartVolume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
+    var dragSeekPosition by remember { mutableLongStateOf(0L) }
 
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -251,6 +253,28 @@ fun VideoPlayerScreen(
                     }
                 )
             })
+            Box(Modifier.fillMaxSize().pointerInput(controller, duration, controlsLocked) {
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        if (controlsLocked || duration <= 0L) return@detectHorizontalDragGestures
+                        dragSeekPosition = controller?.currentPosition?.coerceIn(0L, duration) ?: 0L
+                        gestureHint = formatVideoTime(dragSeekPosition)
+                        controlsVisible = true
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        if (controlsLocked || duration <= 0L) return@detectHorizontalDragGestures
+                        change.consume()
+                        val delta = (dragAmount / size.width.coerceAtLeast(1).toFloat() * duration).toLong()
+                        dragSeekPosition = (dragSeekPosition + delta).coerceIn(0L, duration)
+                        gestureHint = formatVideoTime(dragSeekPosition)
+                    },
+                    onDragEnd = {
+                        controller?.seekTo(dragSeekPosition)
+                        gestureHint = null
+                    },
+                    onDragCancel = { gestureHint = null }
+                )
+            })
             Box(Modifier.fillMaxSize().pointerInput(activity, audioManager, controlsLocked) {
                 detectVerticalDragGestures(
                     onDragStart = { offset ->
@@ -316,14 +340,14 @@ fun VideoPlayerScreen(
                             Text("🔒", color = Color.White, fontSize = 16.sp)
                         }
                         TextButton(onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            if (isPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 runCatching {
                                     activity?.enterPictureInPictureMode(
                                         PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
                                     )
                                 }
                             }
-                        }) { Text("PiP", color = accent, fontSize = 13.sp) }
+                        }, enabled = isPlaying) { Text("PiP", color = if (isPlaying) accent else Color.Gray, fontSize = 13.sp) }
                         TextButton(onClick = { settingsOpen = true; controlsVisible = true }) {
                             Text("⚙", color = Color.White, fontSize = 20.sp)
                         }
