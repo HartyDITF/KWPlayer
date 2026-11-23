@@ -1,6 +1,7 @@
 package fyi.kiyori.modernmediaplayer.feature.video
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
 import android.app.PictureInPictureParams
 import android.os.Build
 import android.util.Rational
@@ -234,10 +235,9 @@ fun VideoPlayerScreen(
                 if (view.player !== controller) view.player = controller
                 if (view.resizeMode != aspectMode) view.resizeMode = aspectMode
                 val color = sideFieldColor.toArgb()
-                if (view.getTag(android.R.id.background) != color) {
+                if ((view.background as? ColorDrawable)?.color != color) {
                     view.setShutterBackgroundColor(color)
                     view.setBackgroundColor(color)
-                    view.setTag(android.R.id.background, color)
                 }
             }
         )
