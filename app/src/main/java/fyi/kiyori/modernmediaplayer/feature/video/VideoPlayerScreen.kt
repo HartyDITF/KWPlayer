@@ -229,11 +229,16 @@ fun VideoPlayerScreen(
                 }
             },
             modifier = Modifier.fillMaxSize(),
-            update = {
-                it.player = controller
-                it.resizeMode = aspectMode
-                it.setShutterBackgroundColor(sideFieldColor.toArgb())
-                it.setBackgroundColor(sideFieldColor.toArgb())
+            update = { view ->
+                // Avoid rebinding Media3's PlayerView on every progress-timer recomposition.
+                if (view.player !== controller) view.player = controller
+                if (view.resizeMode != aspectMode) view.resizeMode = aspectMode
+                val color = sideFieldColor.toArgb()
+                if (view.getTag(android.R.id.background) != color) {
+                    view.setShutterBackgroundColor(color)
+                    view.setBackgroundColor(color)
+                    view.setTag(android.R.id.background, color)
+                }
             }
         )
 
