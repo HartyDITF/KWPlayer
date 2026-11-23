@@ -10,34 +10,37 @@ import androidx.compose.ui.graphics.Color
 fun KwTheme(
     accent: Color = KwColors.DefaultAccent,
     light: Boolean = false,
+    skinId: String = "standard",
     content: @Composable () -> Unit
 ) {
-    val scheme = if (light) {
+    val skin = kwSkin(skinId, light)
+    val onAccent = if (accent.luminance() > 0.32f) Color(0xFF111111) else Color.White
+    val scheme = if (!skin.isDark) {
         lightColorScheme(
             primary = accent,
-            onPrimary = Color.White,
-            secondary = Color(0xFF287C70),
-            background = Color(0xFFF2F4F7),
-            onBackground = Color(0xFF171A20),
-            surface = Color.White,
-            onSurface = Color(0xFF171A20),
-            surfaceVariant = Color(0xFFE5E8ED),
-            onSurfaceVariant = Color(0xFF5D6674),
-            outline = Color(0xFFD0D5DD)
+            onPrimary = onAccent,
+            secondary = skin.accent,
+            background = skin.bg,
+            onBackground = skin.text,
+            surface = skin.surface,
+            onSurface = skin.text,
+            surfaceVariant = skin.raised,
+            onSurfaceVariant = skin.muted,
+            outline = skin.line
         )
     } else {
         darkColorScheme(
             primary = accent,
-            onPrimary = KwColors.TextOnAccent,
-            secondary = KwColors.Lcd,
-            onSecondary = KwColors.LcdBackground,
-            background = KwColors.Background,
-            onBackground = KwColors.Text,
-            surface = KwColors.Panel,
-            onSurface = KwColors.Text,
-            surfaceVariant = KwColors.Border,
-            onSurfaceVariant = KwColors.SecondaryText,
-            outline = KwColors.Border
+            onPrimary = onAccent,
+            secondary = skin.accent,
+            onSecondary = skin.onAccent,
+            background = skin.bg,
+            onBackground = skin.text,
+            surface = skin.surface,
+            onSurface = skin.text,
+            surfaceVariant = skin.raised,
+            onSurfaceVariant = skin.muted,
+            outline = skin.line
         )
     }
     MaterialTheme(colorScheme = scheme, content = content)
