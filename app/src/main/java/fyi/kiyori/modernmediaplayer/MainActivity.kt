@@ -229,6 +229,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
             skin = settings.skin
             accentColor = Color(settings.accentArgb)
             backgroundPlaybackEnabled = settings.backgroundPlaybackEnabled
+            videoLayout = settings.videoLayout
         }
     }
     LaunchedEffect(context) {
@@ -394,7 +395,10 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf("Главная" to 0, "Список" to 1, "Сетка" to 2).forEach { (label, mode) ->
                                     TextButton(
-                                        onClick = { videoLayout = mode },
+                                        onClick = {
+                                            videoLayout = mode
+                                            settingsScope.launch { settingsRepository.setVideoLayout(mode) }
+                                        },
                                         modifier = Modifier.weight(1f).background(
                                             if (videoLayout == mode) colors.raised else Color.Transparent,
                                             skinShape(skin)
