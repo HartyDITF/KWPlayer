@@ -54,7 +54,6 @@ fun VideoPlayerScreen(
 ) {
     val activity = LocalContext.current as? Activity
     val context = LocalContext.current
-    var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var isPlaying by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
     var seekPreview by remember { mutableFloatStateOf(0f) }
@@ -172,12 +171,10 @@ fun VideoPlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
-                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 duration = controller?.duration?.takeIf { it > 0L } ?: 0L
-                position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
             }
 
             override fun onRepeatModeChanged(mode: Int) {
@@ -190,28 +187,17 @@ fun VideoPlayerScreen(
 
             override fun onEvents(player: Player, events: Player.Events) {
                 duration = player.duration.takeIf { it > 0L } ?: 0L
-                position = player.currentPosition.coerceAtLeast(0L)
             }
         }
         controller?.addListener(listener)
         duration = controller?.duration?.takeIf { it > 0L } ?: 0L
-        position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
         repeatMode = controller?.repeatMode ?: Player.REPEAT_MODE_OFF
         shuffleEnabled = controller?.shuffleModeEnabled ?: false
         onDispose { controller?.removeListener(listener) }
     }
 
-    LaunchedEffect(controller, isPlaying, controlsVisible) {
-        val player = controller ?: return@LaunchedEffect
-        while (isPlaying && controlsVisible) {
-            position = player.currentPosition.coerceAtLeast(0L)
-            duration = player.duration.takeIf { it > 0L } ?: 0L
-            delay(500)
-        }
-    }
-
-    LaunchedEffect(controlsVisible) {
-        if (controlsVisible) {
+    LaunchedEffect(controlsVisible, isPlaying) {
+        if (controlsVisible && isPlaying) {
             delay(4500)
             controlsVisible = false
         }
@@ -456,19 +442,7 @@ fun VideoPlayerScreen(
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(formatVideoTime(position), color = Color.White, fontSize = 11.sp)
-                    Slider(
-                        value = if (seeking) seekPreview.coerceIn(0f, duration.coerceAtLeast(1L).toFloat())
-                        else position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-                        onValueChange = { seekPreview = it; seeking = true },
-                        onValueChangeFinished = {
-                            controller?.seekTo(seekPreview.toLong())
-                            seeking = false
-                        },
-                        valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-                        modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
-                    )
-                    Text("-${formatVideoTime((duration - position).coerceAtLeast(0L))}", color = Color.White, fontSize = 11.sp)
+                    VideoTimeline(controller = controller, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
                     Box {
                         TextButton(onClick = { speedMenu = true }) {
                             Text("${String.format(Locale.US, "%.2f", speed)}×", color = accent)
@@ -568,6 +542,51 @@ fun VideoPlayerScreen(
                 TextButton(onClick = { settingsOpen = false }) { Text("Готово", color = accent) }
             }
         )
+    }
+}
+
+
+@Composable
+private fun VideoTimeline(controller: MediaController?, modifier: Modifier = Modifier) {
+    var position by remember(controller) { mutableLongStateOf(controller?.currentPosition?.coerceAtLeast(0L) ?: 0L) }
+    var duration by remember(controller) { mutableLongStateOf(controller?.duration?.takeIf { it > 0L } ?: 0L) }
+    var preview by remember(controller) { mutableFloatStateOf(position.toFloat()) }
+    var seeking by remember { mutableStateOf(false) }
+
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) {
+                duration = player.duration.takeIf { it > 0L } ?: 0L
+                if (!seeking) position = player.currentPosition.coerceAtLeast(0L)
+            }
+        }
+        controller?.addListener(listener)
+        onDispose { controller?.removeListener(listener) }
+    }
+
+    LaunchedEffect(controller) {
+        val player = controller ?: return@LaunchedEffect
+        while (true) {
+            if (!seeking) position = player.currentPosition.coerceAtLeast(0L)
+            duration = player.duration.takeIf { it > 0L } ?: 0L
+            delay(750)
+        }
+    }
+
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(formatVideoTime(position), color = Color.White, fontSize = 11.sp)
+        Slider(
+            value = if (seeking) preview.coerceIn(0f, duration.coerceAtLeast(1L).toFloat())
+            else position.toFloat().coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            onValueChange = { preview = it; seeking = true },
+            onValueChangeFinished = {
+                controller?.seekTo(preview.toLong())
+                seeking = false
+            },
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
+        )
+        Text("-" + formatVideoTime((duration - position).coerceAtLeast(0L)), color = Color.White, fontSize = 11.sp)
     }
 }
 
