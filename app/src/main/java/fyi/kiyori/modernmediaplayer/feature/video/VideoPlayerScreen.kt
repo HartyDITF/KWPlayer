@@ -56,8 +56,6 @@ fun VideoPlayerScreen(
     val context = LocalContext.current
     var duration by remember { mutableLongStateOf(0L) }
     var isPlaying by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
-    var seekPreview by remember { mutableFloatStateOf(0f) }
-    var seeking by remember { mutableStateOf(false) }
     var speed by remember { mutableFloatStateOf(1f) }
     var fullscreen by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
