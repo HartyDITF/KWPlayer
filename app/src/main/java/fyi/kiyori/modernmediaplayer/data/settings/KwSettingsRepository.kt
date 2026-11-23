@@ -24,6 +24,7 @@ data class KwSettings(
     val videoLayout: Int = 0,
     val videoAspectMode: Int = 0,
     val videoSideFieldMode: Int = 0,
+    val videoSideFieldCustomColorArgb: Int = 0xFF202020.toInt(),
     val keepScreenOn: Boolean = true,
     val seekIntervalSeconds: Int = 10
 )
@@ -44,7 +45,8 @@ class KwSettingsRepository(context: Context) {
             backgroundPlaybackEnabled = it[BACKGROUND_PLAYBACK] ?: false,
             videoLayout = (it[VIDEO_LAYOUT] ?: 0).coerceIn(0, 2),
             videoAspectMode = when (it[VIDEO_ASPECT_MODE]) { 0, 3, 4, 5 -> it[VIDEO_ASPECT_MODE]!!; else -> 0 },
-            videoSideFieldMode = (it[VIDEO_SIDE_FIELD_MODE] ?: 0).coerceIn(0, 2),
+            videoSideFieldMode = (it[VIDEO_SIDE_FIELD_MODE] ?: 0).coerceIn(0, 3),
+            videoSideFieldCustomColorArgb = it[VIDEO_SIDE_FIELD_CUSTOM_COLOR] ?: 0xFF202020.toInt(),
             keepScreenOn = it[KEEP_SCREEN_ON] ?: true,
             seekIntervalSeconds = when (it[SEEK_INTERVAL_SECONDS]) { 5, 10, 15, 30 -> it[SEEK_INTERVAL_SECONDS]!!; else -> 10 }
         )
@@ -64,7 +66,10 @@ class KwSettingsRepository(context: Context) {
         store.edit { it[VIDEO_ASPECT_MODE] = if (value == 0 || value == 3 || value == 4 || value == 5) value else 0 }
     }
     suspend fun setVideoSideFieldMode(value: Int) {
-        store.edit { it[VIDEO_SIDE_FIELD_MODE] = value.coerceIn(0, 2) }
+        store.edit { it[VIDEO_SIDE_FIELD_MODE] = value.coerceIn(0, 3) }
+    }
+    suspend fun setVideoSideFieldCustomColor(argb: Int) {
+        store.edit { it[VIDEO_SIDE_FIELD_CUSTOM_COLOR] = argb }
     }
     suspend fun setKeepScreenOn(enabled: Boolean) {
         store.edit { it[KEEP_SCREEN_ON] = enabled }
@@ -76,6 +81,7 @@ class KwSettingsRepository(context: Context) {
     private companion object {
         val VIDEO_ASPECT_MODE = intPreferencesKey("video_aspect_mode")
         val VIDEO_SIDE_FIELD_MODE = intPreferencesKey("video_side_field_mode")
+        val VIDEO_SIDE_FIELD_CUSTOM_COLOR = intPreferencesKey("video_side_field_custom_color")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val SEEK_INTERVAL_SECONDS = intPreferencesKey("seek_interval_seconds")
         val VIDEO_LAYOUT = intPreferencesKey("video_layout")
