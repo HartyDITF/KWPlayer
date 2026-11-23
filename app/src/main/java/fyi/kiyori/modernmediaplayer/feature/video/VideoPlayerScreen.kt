@@ -39,6 +39,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import fyi.kiyori.modernmediaplayer.data.settings.KwSettingsRepository
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.abs
@@ -54,6 +56,8 @@ fun VideoPlayerScreen(
 ) {
     val activity = LocalContext.current as? Activity
     val context = LocalContext.current
+    val settingsRepository = remember(context) { KwSettingsRepository(context) }
+    val settingsScope = rememberCoroutineScope()
     var duration by remember { mutableLongStateOf(0L) }
     var isPlaying by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
     var speed by remember { mutableFloatStateOf(1f) }
@@ -81,6 +85,27 @@ fun VideoPlayerScreen(
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
     var dragSeekPosition by remember { mutableLongStateOf(0L) }
     var dragAxis by remember { mutableIntStateOf(0) }
+
+    val updateAspectMode: (Int) -> Unit = { mode ->
+        aspectMode = mode
+        settingsScope.launch { settingsRepository.setVideoAspectMode(mode) }
+    }
+    val updateSideFieldMode: (Int) -> Unit = { mode ->
+        sideFieldMode = mode
+        settingsScope.launch { settingsRepository.setVideoSideFieldMode(mode) }
+    }
+    val updateKeepScreenOn: (Boolean) -> Unit = { enabled ->
+        keepScreenOn = enabled
+        settingsScope.launch { settingsRepository.setKeepScreenOn(enabled) }
+    }
+
+    LaunchedEffect(settingsRepository) {
+        settingsRepository.settings.collect { settings ->
+            aspectMode = settings.videoAspectMode
+            sideFieldMode = settings.videoSideFieldMode
+            keepScreenOn = settings.keepScreenOn
+        }
+    }
 
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -382,7 +407,7 @@ fun VideoPlayerScreen(
                                 ).forEach { (label, mode) ->
                                     DropdownMenuItem(
                                         text = { Text(label) },
-                                        onClick = { aspectMode = mode; aspectMenu = false; controlsVisible = true }
+                                        onClick = { updateAspectMode(mode); aspectMenu = false; controlsVisible = true }
                                     )
                                 }
                             }
@@ -503,7 +528,7 @@ fun VideoPlayerScreen(
                         "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL
                     ).forEach { (label, mode) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = aspectMode == mode, onClick = { aspectMode = mode })
+                            RadioButton(selected = aspectMode == mode, onClick = { updateAspectMode(mode) })
                             Text(label, modifier = Modifier.padding(start = 4.dp))
                         }
                     }
@@ -511,7 +536,7 @@ fun VideoPlayerScreen(
                     Text("ЦВЕТ БОКОВЫХ ПОЛЕЙ", color = accent, style = MaterialTheme.typography.labelMedium)
                     listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Цвет акцента" to 2).forEach { (label, mode) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = sideFieldMode == mode, onClick = { sideFieldMode = mode })
+                            RadioButton(selected = sideFieldMode == mode, onClick = { updateSideFieldMode(mode) })
                             Text(label, modifier = Modifier.padding(start = 4.dp))
                         }
                     }
@@ -521,7 +546,7 @@ fun VideoPlayerScreen(
                             Text("Не выключать экран")
                             Text("Пока видео воспроизводится", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         }
-                        Switch(checked = keepScreenOn, onCheckedChange = { keepScreenOn = it })
+                        Switch(checked = keepScreenOn, onCheckedChange = updateKeepScreenOn)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
