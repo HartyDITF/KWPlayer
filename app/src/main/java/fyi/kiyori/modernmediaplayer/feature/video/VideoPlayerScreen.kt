@@ -73,6 +73,7 @@ fun VideoPlayerScreen(
     var settingsOpen by remember { mutableStateOf(false) }
     var sideFieldMode by remember { mutableIntStateOf(0) }
     var keepScreenOn by remember { mutableStateOf(true) }
+    var seekIntervalSeconds by remember { mutableIntStateOf(10) }
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     var repeatMode by remember { mutableIntStateOf(controller?.repeatMode ?: Player.REPEAT_MODE_OFF) }
     var shuffleEnabled by remember { mutableStateOf(controller?.shuffleModeEnabled ?: false) }
@@ -106,12 +107,23 @@ fun VideoPlayerScreen(
         keepScreenOn = enabled
         settingsScope.launch { settingsRepository.setKeepScreenOn(enabled) }
     }
+    val updateSeekInterval: (Int) -> Unit = { seconds ->
+        seekIntervalSeconds = seconds
+        settingsScope.launch { settingsRepository.setSeekIntervalSeconds(seconds) }
+    }
+    val seekByInterval: (Long) -> Unit = { direction ->
+        controller?.let { player ->
+            val target = (player.currentPosition + direction * seekIntervalSeconds * 1000L).coerceAtLeast(0L)
+            player.seekTo(if (player.duration > 0L) target.coerceAtMost(player.duration) else target)
+        }
+    }
 
     LaunchedEffect(settingsRepository) {
         settingsRepository.settings.collect { settings ->
             aspectMode = settings.videoAspectMode
             sideFieldMode = settings.videoSideFieldMode
             keepScreenOn = settings.keepScreenOn
+            seekIntervalSeconds = settings.seekIntervalSeconds
         }
     }
 
@@ -268,14 +280,14 @@ fun VideoPlayerScreen(
 
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(controller, controlsLocked) {
+                .pointerInput(controller, controlsLocked, seekIntervalSeconds) {
                 detectTapGestures(
                     onTap = { if (!controlsLocked) { controlsVisible = !controlsVisible; controlsInteractionKey++ } },
                     onDoubleTap = { offset ->
                         if (!controlsLocked) {
                             when {
-                                offset.x < size.width / 3f -> controller?.seekBack()
-                                offset.x > size.width * 2f / 3f -> controller?.seekForward()
+                                offset.x < size.width / 3f -> seekByInterval(-1L)
+                                offset.x > size.width * 2f / 3f -> seekByInterval(1L)
                                 else -> if (controller?.isPlaying == true) controller.pause() else controller?.play()
                             }
                             controlsVisible = true
@@ -514,9 +526,9 @@ fun VideoPlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 FilledTonalButton(
-                    onClick = { controller?.seekBack(); controlsVisible = true },
+                    onClick = { seekByInterval(-1L); controlsVisible = true },
                     colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
-                ) { Text("−10") }
+                ) { Text("−$seekIntervalSeconds") }
                 Button(
                     onClick = {
                         if (controller?.isPlaying == true) controller.pause() else controller?.play()
@@ -527,9 +539,9 @@ fun VideoPlayerScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black)
                 ) { Text(if (controller?.isPlaying == true) "Ⅱ" else "▶", fontSize = 25.sp) }
                 FilledTonalButton(
-                    onClick = { controller?.seekForward(); controlsVisible = true },
+                    onClick = { seekByInterval(1L); controlsVisible = true },
                     colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
-                ) { Text("+10") }
+                ) { Text("+$seekIntervalSeconds") }
             }
         }
     }
@@ -611,6 +623,14 @@ fun VideoPlayerScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = sideFieldMode == mode, onClick = { updateSideFieldMode(mode) })
                             Text(label, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
+                    Divider()
+                    Text("ШАГ ПЕРЕМОТКИ", color = accent, style = MaterialTheme.typography.labelMedium)
+                    listOf(5, 10, 15, 30).forEach { seconds ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = seekIntervalSeconds == seconds, onClick = { updateSeekInterval(seconds) })
+                            Text("$seconds секунд", modifier = Modifier.padding(start = 4.dp))
                         }
                     }
                     Divider()
