@@ -237,8 +237,9 @@ fun VideoPlayerScreen(
             }
         )
 
-        Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().pointerInput(controller, controlsLocked) {
+        Box(
+            Modifier.fillMaxSize()
+                .pointerInput(controller, controlsLocked) {
                 detectTapGestures(
                     onTap = { if (!controlsLocked) controlsVisible = !controlsVisible },
                     onDoubleTap = { offset ->
@@ -252,8 +253,8 @@ fun VideoPlayerScreen(
                         }
                     }
                 )
-            })
-            Box(Modifier.fillMaxSize().pointerInput(controller, duration, controlsLocked) {
+                }
+                .pointerInput(controller, duration, controlsLocked) {
                 detectHorizontalDragGestures(
                     onDragStart = {
                         if (controlsLocked || duration <= 0L) return@detectHorizontalDragGestures
@@ -305,8 +306,8 @@ fun VideoPlayerScreen(
                     onDragEnd = { gestureHint = null },
                     onDragCancel = { gestureHint = null }
                 )
-            })
-        }
+                }
+        )
 
         gestureHint?.let { hint ->
             Surface(modifier = Modifier.align(Alignment.Center), color = Color(0xCC171A20), shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
