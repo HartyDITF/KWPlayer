@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -105,6 +106,16 @@ private data class PlayerColors(
 
 private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист", "Ещё")
 private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Обзор" to "▤", "Плейлист" to "≡", "Ещё" to "•••")
+
+@androidx.compose.runtime.Composable
+private fun tabStringResource(tab: String): Int = when (tab) {
+    "Видео" -> R.string.tab_video
+    "Аудио" -> R.string.tab_audio
+    "Обзор" -> R.string.tab_browse
+    "Плейлист" -> R.string.tab_playlist
+    "Ещё" -> R.string.tab_more
+    else -> R.string.tab_video
+}
 
 private fun colorsForSkin(skin: String): PlayerColors {
     val tokens = kwSkin(skin)
@@ -345,7 +356,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(tabIcons[name] ?: "", color = if (tab == name) colors.accent else colors.muted)
-                                    Text(name.uppercase(Locale.ROOT), color = if (tab == name) colors.text else colors.muted, fontSize = 9.sp)
+                                    Text(stringResource(tabStringResource(name)).uppercase(Locale.ROOT), color = if (tab == name) colors.text else colors.muted, fontSize = 9.sp)
                                 }
                             }
                         }
@@ -598,7 +609,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 selected = tab == name,
                                 onClick = { tab = name; query = ""; favoritesOnly = false },
                                 icon = { Text(tabIcons[name] ?: "", color = if (tab == name) colors.accent else colors.muted) },
-                                label = { Text(name, fontSize = 9.sp) }
+                                label = { Text(stringResource(tabStringResource(name)), fontSize = 9.sp) }
                             )
                         }
                     }
