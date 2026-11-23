@@ -101,7 +101,7 @@ private data class PlayerColors(
     val accent: Color, val text: Color, val muted: Color
 )
 
-private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист")
+private val tabs = listOf("Видео", "Аудио", "Обзор", "Плейлист", "Ещё")
 private val tabIcons = mapOf("Видео" to "▣", "Аудио" to "♫", "Обзор" to "▤", "Плейлист" to "≡", "Ещё" to "•••")
 
 private fun colorsForSkin(skin: String): PlayerColors {
@@ -183,6 +183,7 @@ private fun KwPlayerScreen(controller: MediaController?) {
     var downloadedApk by remember { mutableStateOf<File?>(null) }
     var updateBusy by remember { mutableStateOf(false) }
     var showSkins by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
     var activePlayerScreen by remember { mutableStateOf("library") }
     var isVideoItem by remember { mutableStateOf(false) }
     var accentColor by remember { mutableStateOf(Color(0xFFFF8F1F)) }
@@ -311,9 +312,22 @@ private fun KwPlayerScreen(controller: MediaController?) {
                         Text(if (tab == "Настройки") "ПЕРСОНАЛИЗАЦИЯ И ПАРАМЕТРЫ" else if (skin == "winamp") "WINAMP MODERN SKIN • LOCAL MEDIA" else "ЛОКАЛЬНЫЙ МЕДИАПЛЕЕР",
                         color = colors.muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
                     }
+                    TextButton(onClick = { searchExpanded = !searchExpanded }) {
+                        Text("⌕", color = colors.accent, fontSize = 23.sp)
+                    }
                     TextButton(onClick = { tab = if (tab == "Настройки") "Видео" else "Настройки" }) {
                         Text(if (tab == "Настройки") "←" else "⚙", color = colors.accent, fontSize = 22.sp)
                     }
+                }
+
+                if (searchExpanded) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        label = { Text("Поиск по медиатеке") },
+                        singleLine = true
+                    )
                 }
 
                 if (topTabs(skin)) {
@@ -450,7 +464,20 @@ private fun KwPlayerScreen(controller: MediaController?) {
                                 }
                             }
                         }
-                        else -> {
+                        "Ещё" -> {
+                            PageTitle("Ещё", "Дополнительные возможности KW Player", colors)
+                            Panel(skin, colors) {
+                                Text("НАСТРОЙКИ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Параметры воспроизведения, оформления и обновлений находятся в настройках приложения.", color = colors.muted, fontSize = 12.sp)
+                                ActionButton(colors, "Открыть настройки") { tab = "Настройки" }
+                            }
+                            Panel(skin, colors) {
+                                Text("KW PLAYER", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Kibato Watch Player • ${BuildConfig.VERSION_NAME}", color = colors.text)
+                                Text("Локальный медиаплеер без рекламы, аккаунтов и отправки медиаданных.", color = colors.muted, fontSize = 11.sp)
+                            }
+                        }
+                        "Настройки" -> {
                             PageTitle("Настройки", "Внешний вид, воспроизведение и обновления", colors)
                             Panel(skin, colors) {
                                 Text("ТЕКУЩЕЕ ВОСПРОИЗВЕДЕНИЕ", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
