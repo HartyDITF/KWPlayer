@@ -78,9 +78,9 @@ fun VideoPlayerScreen(
         2 -> accent.copy(alpha = 0.24f)
         else -> Color.Black
     }
-    var dragStartVolume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
     var dragSeekPosition by remember { mutableLongStateOf(0L) }
+    var dragAxis by remember { mutableIntStateOf(0) }
 
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -250,16 +250,17 @@ fun VideoPlayerScreen(
                         onDragStart = { offset ->
                             if (!controlsLocked) {
                                 dragSeekPosition = controller?.currentPosition?.coerceIn(0L, duration.coerceAtLeast(0L)) ?: 0L
-                                dragStartVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                                 dragStartBrightness = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f
-                                gestureHint = if (offset.x < size.width / 2f) "Яркость / перемотка" else "Громкость / перемотка"
+                                dragAxis = 0
+                                gestureHint = "Перемотка"
                                 revealControls()
                             }
                         },
                         onDrag = { change, dragAmount ->
                             if (!controlsLocked) {
                                 change.consume()
-                                if (abs(dragAmount.x) >= abs(dragAmount.y)) {
+                                if (dragAxis == 0) dragAxis = if (abs(dragAmount.x) >= abs(dragAmount.y)) 1 else 2
+                                if (dragAxis == 1) {
                                     if (duration > 0L) {
                                         val delta = (dragAmount.x / size.width.coerceAtLeast(1).toFloat() * duration).toLong()
                                         dragSeekPosition = (dragSeekPosition + delta).coerceIn(0L, duration)
@@ -285,12 +286,13 @@ fun VideoPlayerScreen(
                             }
                         },
                         onDragEnd = {
-                            if (!controlsLocked && duration > 0L && gestureHint?.matches(Regex("\\d{2}:\\d{2}(:\\d{2})?")) == true) {
+                            if (!controlsLocked && dragAxis == 1 && duration > 0L) {
                                 controller?.seekTo(dragSeekPosition)
                             }
                             gestureHint = null
+                            dragAxis = 0
                         },
-                        onDragCancel = { gestureHint = null }
+                        onDragCancel = { gestureHint = null; dragAxis = 0 }
                     )
                 }
         )
@@ -426,7 +428,7 @@ fun VideoPlayerScreen(
                             checked = backgroundPlaybackEnabled,
                             onCheckedChange = {
                                 onBackgroundPlaybackChange(it)
-                                controlsVisible = true
+                                revealControls()
                             }
                         )
                     }
