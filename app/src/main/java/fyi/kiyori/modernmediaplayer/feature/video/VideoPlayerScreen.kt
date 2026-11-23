@@ -229,23 +229,28 @@ fun VideoPlayerScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+        val videoFrameWidth = minOf(maxWidth, maxHeight * (4f / 3f))
+        val videoFrameHeight = videoFrameWidth * (3f / 4f)
+        val playerResizeMode = if (aspectMode == 5) AspectRatioFrameLayout.RESIZE_MODE_FIT else aspectMode
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
-                    resizeMode = aspectMode
+                    resizeMode = playerResizeMode
                     setKeepContentOnPlayerReset(true)
                     setShutterBackgroundColor(sideFieldColor.toArgb())
                     setBackgroundColor(sideFieldColor.toArgb())
                     player = controller
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = if (aspectMode == 5) {
+                Modifier.align(Alignment.Center).width(videoFrameWidth).height(videoFrameHeight)
+            } else Modifier.fillMaxSize(),
             update = { view ->
                 // Avoid rebinding Media3's PlayerView on every progress-timer recomposition.
                 if (view.player !== controller) view.player = controller
-                if (view.resizeMode != aspectMode) view.resizeMode = aspectMode
+                if (view.resizeMode != playerResizeMode) view.resizeMode = playerResizeMode
                 val color = sideFieldColor.toArgb()
                 if ((view.background as? ColorDrawable)?.color != color) {
                     view.setShutterBackgroundColor(color)
@@ -526,7 +531,8 @@ fun VideoPlayerScreen(
                     listOf(
                         "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
                         "Заполнить экран" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
-                        "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL,
+                        "4:3" to 5
                     ).forEach { (label, mode) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = aspectMode == mode, onClick = { updateAspectMode(mode) })
