@@ -7,6 +7,7 @@ import android.graphics.drawable.ColorDrawable
 import android.content.ContentValues
 import android.provider.MediaStore
 import android.view.SurfaceView
+import android.view.View
 import android.os.Handler
 import android.os.Looper
 import android.app.PictureInPictureParams
@@ -51,6 +52,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 import fyi.kiyori.modernmediaplayer.data.settings.KwSettingsRepository
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -86,6 +90,7 @@ fun VideoPlayerScreen(
     var sideFieldMode by remember { mutableIntStateOf(0) }
     var customSideFieldColorArgb by remember { mutableIntStateOf(0xFF202020.toInt()) }
     var customSideFieldColorText by remember { mutableStateOf("202020") }
+    var adaptiveSideFieldColorArgb by remember { mutableIntStateOf(0xFF202020.toInt()) }
     var keepScreenOn by remember { mutableStateOf(true) }
     var seekIntervalSeconds by remember { mutableIntStateOf(10) }
     var aspectMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
@@ -106,6 +111,7 @@ fun VideoPlayerScreen(
         1 -> Color(0xFF101419)
         2 -> accent.copy(alpha = 0.24f)
         3 -> Color(customSideFieldColorArgb)
+        4 -> Color(adaptiveSideFieldColorArgb)
         else -> Color.Black
     }
     var dragStartBrightness by remember { mutableFloatStateOf(0.5f) }
@@ -269,10 +275,45 @@ fun VideoPlayerScreen(
         if (fullscreen) {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            insets.hide(WindowInsetsCompat.Type.systemBars())
+            insets.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
         } else {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             insets.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    DisposableEffect(activity, fullscreen) {
+        val decorView = activity?.window?.decorView
+        val focusListener = ViewTreeFocusListener { hasFocus ->
+            if (hasFocus && fullscreen) {
+                val window = activity?.window ?: return@ViewTreeFocusListener
+                WindowInsetsControllerCompat(window, window.decorView).apply {
+                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+                }
+            }
+        }
+        decorView?.viewTreeObserver?.addOnWindowFocusChangeListener(focusListener)
+        onDispose {
+            decorView?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnWindowFocusChangeListener(focusListener)
+        }
+    }
+
+    LaunchedEffect(sideFieldMode, isPlaying, playerView) {
+        if (sideFieldMode != 4 || !isPlaying) return@LaunchedEffect
+        val surface = playerView?.videoSurfaceView as? SurfaceView ?: return@LaunchedEffect
+        while (isPlaying && sideFieldMode == 4) {
+            if (surface.isAttachedToWindow && surface.width > 0 && surface.height > 0) {
+                sampleAmbientColor(surface)?.let { sampled ->
+                    // Keep the ambient fill subdued so it complements the picture without distracting.
+                    adaptiveSideFieldColorArgb = android.graphics.Color.rgb(
+                        (android.graphics.Color.red(sampled) * 0.42f).roundToInt().coerceIn(0, 255),
+                        (android.graphics.Color.green(sampled) * 0.42f).roundToInt().coerceIn(0, 255),
+                        (android.graphics.Color.blue(sampled) * 0.42f).roundToInt().coerceIn(0, 255)
+                    )
+                }
+            }
+            delay(500)
         }
     }
 
@@ -449,7 +490,7 @@ fun VideoPlayerScreen(
                 Column(
                     Modifier.fillMaxWidth()
                         .background(Color(0xB8000000))
-                        .statusBarsPadding()
+                        .then(if (fullscreen) Modifier else Modifier.statusBarsPadding())
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Row(
@@ -652,7 +693,7 @@ fun VideoPlayerScreen(
                 Column(
                     Modifier.fillMaxWidth()
                         .background(Color(0xB8000000))
-                        .navigationBarsPadding()
+                        .then(if (fullscreen) Modifier else Modifier.navigationBarsPadding())
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
                     VideoTimeline(controller = controller, modifier = Modifier.fillMaxWidth())
@@ -800,7 +841,7 @@ fun VideoPlayerScreen(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Акцент" to 2, "Свой цвет" to 3).forEach { (label, mode) ->
+                    listOf("Чёрный" to 0, "Тёмно-серый" to 1, "Акцент" to 2, "Свой цвет" to 3, "Адаптивные" to 4).forEach { (label, mode) ->
                         FilterChip(
                             selected = sideFieldMode == mode,
                             onClick = { updateSideFieldMode(mode) },
@@ -874,6 +915,51 @@ fun VideoPlayerScreen(
     }
 
 }
+
+private fun interface ViewTreeFocusListener : android.view.ViewTreeObserver.OnWindowFocusChangeListener {
+    override fun onWindowFocusChanged(hasFocus: Boolean)
+}
+
+private suspend fun sampleAmbientColor(surface: SurfaceView): Int? =
+    suspendCancellableCoroutine { continuation ->
+        val bitmap = runCatching { Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888) }.getOrNull()
+        if (bitmap == null) {
+            continuation.resume(null)
+            return@suspendCancellableCoroutine
+        }
+        runCatching {
+            PixelCopy.request(surface, bitmap, { result ->
+                if (result != PixelCopy.SUCCESS) {
+                    bitmap.recycle()
+                    if (continuation.isActive) continuation.resume(null)
+                } else {
+                    CoroutineScope(continuation.context).launch(Dispatchers.Default) {
+                        var red = 0L
+                        var green = 0L
+                        var blue = 0L
+                        val pixels = IntArray(bitmap.width * bitmap.height)
+                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                        pixels.forEach { pixel ->
+                            red += android.graphics.Color.red(pixel)
+                            green += android.graphics.Color.green(pixel)
+                            blue += android.graphics.Color.blue(pixel)
+                        }
+                        val count = pixels.size.coerceAtLeast(1).toLong()
+                        val average = android.graphics.Color.rgb(
+                            (red / count).toInt(),
+                            (green / count).toInt(),
+                            (blue / count).toInt()
+                        )
+                        bitmap.recycle()
+                        if (continuation.isActive) continuation.resume(average)
+                    }
+                }
+            }, Handler(Looper.getMainLooper()))
+        }.onFailure {
+            bitmap.recycle()
+            if (continuation.isActive) continuation.resume(null)
+        }
+    }
 
 private fun saveSnapshotToGallery(context: android.content.Context, bitmap: Bitmap): Boolean = runCatching {
     val values = ContentValues().apply {
