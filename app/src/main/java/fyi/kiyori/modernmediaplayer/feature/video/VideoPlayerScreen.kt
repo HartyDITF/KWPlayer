@@ -79,6 +79,7 @@ fun VideoPlayerScreen(
     val revealControls: () -> Unit = { controlsVisible = true; controlsInteractionKey++ }
     var controlsLocked by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
     var aspectMenu by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
@@ -446,220 +447,259 @@ fun VideoPlayerScreen(
 
         if (controlsVisible && !controlsLocked) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.fillMaxWidth().background(Color(0xB8000000))) {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(Color(0xB8000000))
+                        .statusBarsPadding()
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
                     Row(
-                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp),
+                        Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(onClick = onClose) { Text("‹", color = Color.White, fontSize = 28.sp) }
-                        Column(Modifier.weight(1f)) {
-                            Text(title, color = Color.White, maxLines = 1)
-                            Text("KW PLAYER", color = Color.LightGray, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                        TextButton(onClick = onClose, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)) {
+                            Text("‹", color = Color.White, fontSize = 30.sp)
                         }
-                        TextButton(onClick = { controlsLocked = true; controlsVisible = false }) {
-                            Text("🔒", color = Color.White, fontSize = 16.sp)
+                        Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                            Text(title, color = Color.White, maxLines = 1, fontSize = 15.sp)
+                            Text("KW Player", color = Color.LightGray, fontSize = 10.sp)
                         }
-                        TextButton(onClick = {
-                            if (isPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                runCatching {
-                                    activity?.enterPictureInPictureMode(
-                                        PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
-                                    )
-                                }
-                            }
-                        }, enabled = isPlaying) { Text("PiP", color = if (isPlaying) accent else Color.Gray, fontSize = 13.sp) }
-                        TextButton(onClick = { settingsOpen = true; controlsVisible = true }) {
-                            Text("⚙", color = Color.White, fontSize = 20.sp)
-                        }
-                        TextButton(onClick = { fullscreen = !fullscreen; controlsVisible = true }) {
-                            Text(if (fullscreen) "⤢" else "⛶", color = Color.White, fontSize = 20.sp)
-                        }
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         TextButton(
                             onClick = {
-                                controller?.let {
-                                    TrackSelectionDialogBuilder(context, "Аудиодорожка", it, C.TRACK_TYPE_AUDIO)
-                                        .setShowDisableOption(false)
-                                        .setAllowAdaptiveSelections(true)
-                                        .build().show()
-                                }
-                            },
-                            enabled = controller != null
-                        ) { Text("Аудио", color = accent) }
-                        TextButton(
-                            onClick = {
-                                controller?.let {
-                                    TrackSelectionDialogBuilder(context, "Субтитры", it, C.TRACK_TYPE_TEXT)
-                                        .setShowDisableOption(true)
-                                        .setAllowAdaptiveSelections(false)
-                                        .build().show()
-                                }
-                            },
-                            enabled = controller != null
-                        ) { Text("Дорожки", color = accent) }
-                        TextButton(onClick = {
-                            subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
-                        }) { Text("Файл субтитров", color = accent) }
-                        TextButton(onClick = { captureVideoFrame() }, enabled = controller != null && !isPlaying) {
-                            Text("Кадр", color = if (controller != null && !isPlaying) accent else Color.Gray)
-                        }
-                        TextButton(onClick = {
-                            val uri = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
-                            if (uri != null) {
-                                bookmarkUri = uri
-                                bookmarks = loadVideoBookmarks(bookmarkPreferences, uri)
-                                bookmarkDialog = true
-                            }
-                        }, enabled = controller?.currentMediaItem != null) { Text("Закладки", color = accent) }
-                        Box {
-                            TextButton(onClick = { aspectMenu = true }) { Text("Формат кадра", color = accent) }
-                            DropdownMenu(expanded = aspectMenu, onDismissRequest = { aspectMenu = false }) {
-                                listOf(
-                                    "По размеру" to AspectRatioFrameLayout.RESIZE_MODE_FIT,
-                                    "Заполнить" to AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
-                                    "Растянуть" to AspectRatioFrameLayout.RESIZE_MODE_FILL,
-                                    "4:3" to 5
-                                ).forEach { (label, mode) ->
-                                    DropdownMenuItem(
-                                        text = { Text(label) },
-                                        onClick = { updateAspectMode(mode); aspectMenu = false; controlsVisible = true }
-                                    )
-                                }
-                            }
-                        }
-                        TextButton(onClick = {
-                            repeatMode = when (repeatMode) {
-                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
-                                Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
-                                else -> Player.REPEAT_MODE_OFF
-                            }
-                            controller?.repeatMode = repeatMode
-                        }) {
-                            Text(
-                                when (repeatMode) {
-                                    Player.REPEAT_MODE_ONE -> "Повтор: 1"
-                                    Player.REPEAT_MODE_ALL -> "Повтор: всё"
-                                    else -> "Повтор: выкл."
-                                },
-                                color = accent
-                            )
-                        }
-                        TextButton(onClick = {
-                            val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
-                            when {
-                                abStartPosition == null -> {
-                                    abStartPosition = position
-                                    abEndPosition = null
-                                    subtitleNotice = "Точка A: ${formatVideoTime(position)}"
-                                }
-                                abEndPosition == null -> {
-                                    if (position <= (abStartPosition ?: 0L) + 500L) {
-                                        subtitleNotice = "Точка B должна быть позже точки A"
-                                    } else {
-                                        abEndPosition = position
-                                        subtitleNotice = "Повтор A–B включён"
+                                if (isPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    runCatching {
+                                        activity?.enterPictureInPictureMode(
+                                            PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+                                        )
                                     }
                                 }
-                                else -> {
-                                    abStartPosition = null
-                                    abEndPosition = null
-                                    subtitleNotice = "Повтор A–B выключен"
-                                }
-                            }
-                            controlsVisible = true
-                        }, enabled = controller?.currentMediaItem != null) {
-                            Text(
-                                when {
-                                    abStartPosition == null -> "A–B"
-                                    abEndPosition == null -> "A: ${formatVideoTime(abStartPosition ?: 0L)}"
-                                    else -> "A–B: повтор"
-                                },
-                                color = if (abEndPosition != null) accent else Color.White
-                            )
-                        }
-                        TextButton(onClick = {
-                            shuffleEnabled = !shuffleEnabled
-                            controller?.shuffleModeEnabled = shuffleEnabled
-                        }) { Text(if (shuffleEnabled) "Перемешивание: вкл." else "Перемешивание", color = accent) }
-                    }
-                    subtitleNotice?.let {
-                        Text(it, color = Color.LightGray, fontSize = 10.sp, modifier = Modifier.padding(start = 14.dp, bottom = 3.dp))
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Фоновое воспроизведение", color = Color.White, fontSize = 12.sp)
-                            Text(
-                                if (backgroundPlaybackEnabled) "Продолжать звук после сворачивания" else "При сворачивании видео будет остановлено",
-                                color = Color.LightGray,
-                                fontSize = 9.sp
-                            )
-                        }
-                        Switch(
-                            checked = backgroundPlaybackEnabled,
-                            onCheckedChange = {
-                                onBackgroundPlaybackChange(it)
-                                revealControls()
-                            }
-                        )
-                    }
-                }
-
-                Row(
-                    Modifier.fillMaxWidth().background(Color(0xB8000000)).navigationBarsPadding()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    VideoTimeline(controller = controller, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
-                    Box {
-                        TextButton(onClick = { speedMenu = true }) {
-                            Text("${String.format(Locale.US, "%.2f", speed)}×", color = accent)
-                        }
-                        DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
-                            listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f).forEach { value ->
+                            },
+                            enabled = isPlaying,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) { Text("▣", color = if (isPlaying) Color.White else Color.Gray, fontSize = 19.sp) }
+                        TextButton(
+                            onClick = { settingsOpen = true; controlsVisible = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) { Text("⚙", color = Color.White, fontSize = 21.sp) }
+                        Box {
+                            TextButton(
+                                onClick = { moreMenu = true },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) { Text("⋮", color = Color.White, fontSize = 24.sp) }
+                            DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                                 DropdownMenuItem(
-                                    text = { Text(if (value == 1f) "Обычная скорость" else "${value}×") },
+                                    text = { Text("Аудиодорожка") },
                                     onClick = {
-                                        speed = value
-                                        controller?.setPlaybackSpeed(value)
-                                        speedMenu = false
-                                        controlsVisible = true
+                                        moreMenu = false
+                                        controller?.let {
+                                            TrackSelectionDialogBuilder(context, "Аудиодорожка", it, C.TRACK_TYPE_AUDIO)
+                                                .setShowDisableOption(false)
+                                                .setAllowAdaptiveSelections(true)
+                                                .build().show()
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Субтитры") },
+                                    onClick = {
+                                        moreMenu = false
+                                        controller?.let {
+                                            TrackSelectionDialogBuilder(context, "Субтитры", it, C.TRACK_TYPE_TEXT)
+                                                .setShowDisableOption(true)
+                                                .setAllowAdaptiveSelections(false)
+                                                .build().show()
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Загрузить файл субтитров") },
+                                    onClick = {
+                                        moreMenu = false
+                                        subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Снимок кадра") },
+                                    enabled = controller != null && !isPlaying,
+                                    onClick = { moreMenu = false; captureVideoFrame() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Закладки") },
+                                    enabled = controller?.currentMediaItem != null,
+                                    onClick = {
+                                        moreMenu = false
+                                        val uri = controller?.currentMediaItem?.localConfiguration?.uri?.toString()
+                                        if (uri != null) {
+                                            bookmarkUri = uri
+                                            bookmarks = loadVideoBookmarks(bookmarkPreferences, uri)
+                                            bookmarkDialog = true
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (repeatMode) {
+                                                Player.REPEAT_MODE_ONE -> "Повтор видео: включён"
+                                                Player.REPEAT_MODE_ALL -> "Повтор очереди: включён"
+                                                else -> "Повтор: выключен"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        repeatMode = when (repeatMode) {
+                                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+                                            Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+                                            else -> Player.REPEAT_MODE_OFF
+                                        }
+                                        controller?.repeatMode = repeatMode
+                                        moreMenu = false
+                                        revealControls()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (shuffleEnabled) "Выключить перемешивание" else "Перемешать очередь") },
+                                    onClick = {
+                                        shuffleEnabled = !shuffleEnabled
+                                        controller?.shuffleModeEnabled = shuffleEnabled
+                                        moreMenu = false
+                                        revealControls()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when {
+                                                abStartPosition == null -> "Начать повтор A–B"
+                                                abEndPosition == null -> "Установить точку B"
+                                                else -> "Выключить повтор A–B"
+                                            }
+                                        )
+                                    },
+                                    enabled = controller?.currentMediaItem != null,
+                                    onClick = {
+                                        moreMenu = false
+                                        val position = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                                        when {
+                                            abStartPosition == null -> {
+                                                abStartPosition = position
+                                                abEndPosition = null
+                                                subtitleNotice = "Точка A: \${formatVideoTime(position)}"
+                                            }
+                                            abEndPosition == null -> {
+                                                if (position <= (abStartPosition ?: 0L) + 500L) {
+                                                    subtitleNotice = "Точка B должна быть позже точки A"
+                                                } else {
+                                                    abEndPosition = position
+                                                    subtitleNotice = "Повтор A–B включён"
+                                                }
+                                            }
+                                            else -> {
+                                                abStartPosition = null
+                                                abEndPosition = null
+                                                subtitleNotice = "Повтор A–B выключен"
+                                            }
+                                        }
+                                        revealControls()
                                     }
                                 )
                             }
                         }
                     }
                 }
-            }
 
-            Row(
-                Modifier.align(Alignment.Center),
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilledTonalButton(
-                    onClick = { seekByInterval(-1L); controlsVisible = true },
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
-                ) { Text("−$seekIntervalSeconds") }
-                Button(
-                    onClick = {
-                        if (controller?.isPlaying == true) controller.pause() else controller?.play()
-                        controlsVisible = true
-                    },
-                    modifier = Modifier.size(68.dp),
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black)
-                ) { Text(if (controller?.isPlaying == true) "Ⅱ" else "▶", fontSize = 25.sp) }
-                FilledTonalButton(
-                    onClick = { seekByInterval(1L); controlsVisible = true },
-                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x99000000), contentColor = Color.White)
-                ) { Text("+$seekIntervalSeconds") }
+                Row(
+                    Modifier.align(Alignment.Center)
+                        .fillMaxWidth()
+                        .padding(horizontal = 30.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { seekByInterval(-1L); revealControls() },
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("↶", color = Color.White, fontSize = 30.sp)
+                            Text("\${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            if (controller?.isPlaying == true) controller.pause() else controller?.play()
+                            revealControls()
+                        },
+                        modifier = Modifier.size(68.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xEFFFFFFF),
+                            contentColor = Color.Black
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(if (isPlaying) "Ⅱ" else "▶", fontSize = 27.sp)
+                    }
+                    TextButton(
+                        onClick = { seekByInterval(1L); revealControls() },
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("↷", color = Color.White, fontSize = 30.sp)
+                            Text("\${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(Color(0xB8000000))
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                ) {
+                    VideoTimeline(controller = controller, modifier = Modifier.fillMaxWidth())
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { settingsOpen = true; controlsVisible = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("Настройки", color = Color.White, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Box {
+                            TextButton(
+                                onClick = { speedMenu = true; revealControls() },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("\${String.format(Locale.US, "%.2f", speed)}×", color = Color.White, fontSize = 12.sp)
+                            }
+                            DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
+                                listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f).forEach { value ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (value == 1f) "Обычная скорость" else "\${value}×") },
+                                        onClick = {
+                                            speed = value
+                                            controller?.setPlaybackSpeed(value)
+                                            speedMenu = false
+                                            revealControls()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        TextButton(
+                            onClick = { fullscreen = !fullscreen; revealControls() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(if (fullscreen) "⛶" else "⤢", color = Color.White, fontSize = 19.sp)
+                        }
+                    }
+                    subtitleNotice?.let {
+                        Text(it, color = Color.LightGray, fontSize = 10.sp, modifier = Modifier.padding(start = 8.dp, bottom = 2.dp))
+                    }
+                }
             }
         }
     }
