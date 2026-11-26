@@ -80,7 +80,6 @@ fun VideoPlayerScreen(
     var controlsLocked by remember { mutableStateOf(false) }
     var speedMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
-    var aspectMenu by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var pendingSnapshot by remember { mutableStateOf<Bitmap?>(null) }
@@ -584,7 +583,7 @@ fun VideoPlayerScreen(
                                             abStartPosition == null -> {
                                                 abStartPosition = position
                                                 abEndPosition = null
-                                                subtitleNotice = "Точка A: \${formatVideoTime(position)}"
+                                                subtitleNotice = "Точка A: ${formatVideoTime(position)}"
                                             }
                                             abEndPosition == null -> {
                                                 if (position <= (abStartPosition ?: 0L) + 500L) {
@@ -621,7 +620,7 @@ fun VideoPlayerScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("↶", color = Color.White, fontSize = 30.sp)
-                            Text("\${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
+                            Text("${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
                         }
                     }
                     Button(
@@ -645,7 +644,7 @@ fun VideoPlayerScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("↷", color = Color.White, fontSize = 30.sp)
-                            Text("\${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
+                            Text("${seekIntervalSeconds}", color = Color.White, fontSize = 11.sp)
                         }
                     }
                 }
@@ -673,12 +672,12 @@ fun VideoPlayerScreen(
                                 onClick = { speedMenu = true; revealControls() },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text("\${String.format(Locale.US, "%.2f", speed)}×", color = Color.White, fontSize = 12.sp)
+                                Text("${String.format(Locale.US, "%.2f", speed)}×", color = Color.White, fontSize = 12.sp)
                             }
                             DropdownMenu(expanded = speedMenu, onDismissRequest = { speedMenu = false }) {
                                 listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f, 4f).forEach { value ->
                                     DropdownMenuItem(
-                                        text = { Text(if (value == 1f) "Обычная скорость" else "\${value}×") },
+                                        text = { Text(if (value == 1f) "Обычная скорость" else "${value}×") },
                                         onClick = {
                                             speed = value
                                             controller?.setPlaybackSpeed(value)
@@ -974,6 +973,11 @@ private fun VideoTimeline(controller: MediaController?, modifier: Modifier = Mod
                 seeking = false
             },
             valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = Color(0xFFFF0033),
+                activeTrackColor = Color(0xFFFF0033),
+                inactiveTrackColor = Color.White.copy(alpha = 0.30f)
+            ),
             modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
         )
         Text("-" + formatVideoTime((duration - position).coerceAtLeast(0L)), color = Color.White, fontSize = 11.sp)
