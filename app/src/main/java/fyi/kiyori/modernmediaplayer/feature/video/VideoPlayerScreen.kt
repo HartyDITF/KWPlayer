@@ -608,7 +608,7 @@ fun VideoPlayerScreen(
                 }
 
                 Row(
-                    Modifier.align(Alignment.Center)
+                    Modifier.align(Alignment.CenterHorizontally)
                         .fillMaxWidth()
                         .padding(horizontal = 30.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
