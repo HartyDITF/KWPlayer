@@ -249,11 +249,16 @@ fun VideoPlayerScreen(
     DisposableEffect(activity) {
         val oldOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         val wasKeepScreenOn = activity?.window?.let { (it.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0 } ?: false
+        val wasFullscreen = activity?.window?.let {
+            (it.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN) != 0
+        } ?: false
         onDispose {
             activity?.requestedOrientation = oldOrientation
             activity?.window?.let { window ->
                 if (wasKeepScreenOn) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if (wasFullscreen) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 window.attributes = window.attributes.apply {
                     screenBrightness = originalScreenBrightness
                 }
@@ -271,14 +276,12 @@ fun VideoPlayerScreen(
 
     LaunchedEffect(activity, fullscreen) {
         val window = activity?.window ?: return@LaunchedEffect
-        val insets = WindowInsetsControllerCompat(window, window.decorView)
         if (fullscreen) {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            insets.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+            applyVideoImmersiveMode(window, enabled = true)
         } else {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            insets.show(WindowInsetsCompat.Type.systemBars())
+            applyVideoImmersiveMode(window, enabled = false)
         }
     }
 
@@ -286,11 +289,7 @@ fun VideoPlayerScreen(
         val decorView = activity?.window?.decorView
         val focusListener = ViewTreeFocusListener { hasFocus ->
             if (hasFocus && fullscreen) {
-                val window = activity?.window ?: return@ViewTreeFocusListener
-                WindowInsetsControllerCompat(window, window.decorView).apply {
-                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
-                }
+                activity?.window?.let { applyVideoImmersiveMode(it, enabled = true) }
             }
         }
         decorView?.viewTreeObserver?.addOnWindowFocusChangeListener(focusListener)
@@ -914,6 +913,22 @@ fun VideoPlayerScreen(
         }
     }
 
+}
+
+private fun applyVideoImmersiveMode(window: android.view.Window, enabled: Boolean) {
+    val controller = WindowInsetsControllerCompat(window, window.decorView)
+    if (enabled) {
+        // FLAG_FULLSCREEN independently suppresses the status bar; insets hide also
+        // covers navigation and display-cutout system UI on modern Android versions.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(
+            WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+        )
+    } else {
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        controller.show(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+    }
 }
 
 private fun interface ViewTreeFocusListener : android.view.ViewTreeObserver.OnWindowFocusChangeListener {
